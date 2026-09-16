@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes turn-drain {
+  from {
+    transform: scaleX(1);
+    background-color: #34d399;
+  }
+  70% {
+    background-color: #fbbf24;
+  }
+  to {
+    transform: scaleX(0);
+    background-color: #ef4444;
+  }
+}
+
+.turn-timer {
+  transform-origin: left;
+  animation-name: turn-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
