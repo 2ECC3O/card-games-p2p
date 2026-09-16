@@ -8,14 +8,20 @@ interface Props {
 
 const SUIT = { s: '♠', h: '♥', d: '♦', c: '♣' } as const;
 
-function CardView({ card, big = false }: { card: Card; big?: boolean }) {
-  const size = big ? 'h-14 w-10 text-lg' : 'h-9 w-6.5 text-xs';
+const SIZE = {
+  seat: 'h-12 w-9 text-base sm:h-16 sm:w-12 sm:text-xl',
+  large: 'h-16 w-12 text-xl sm:h-20 sm:w-14 sm:text-2xl',
+};
+
+function CardView({ card, size, className = '', delayMs }: { card: Card; size: keyof typeof SIZE; className?: string; delayMs?: number }) {
+  const base = `${SIZE[size]} ${className} rounded-md`;
+  const style = delayMs === undefined ? undefined : { animationDelay: `${delayMs}ms` };
   if (card === '??') {
-    return <div className={`${size} rounded-md border border-white/20 bg-[repeating-linear-gradient(45deg,#1e3a8a_0_4px,#1e40af_4px_8px)]`} />;
+    return <div style={style} className={`${base} border border-white/20 bg-[repeating-linear-gradient(45deg,#1e3a8a_0_4px,#1e40af_4px_8px)]`} />;
   }
   const red = card[1] === 'h' || card[1] === 'd';
   return (
-    <div className={`${size} flex flex-col items-center justify-center rounded-md bg-white font-bold leading-none shadow ${red ? 'text-rose-600' : 'text-slate-900'}`}>
+    <div style={style} className={`${base} flex flex-col items-center justify-center bg-white font-bold leading-none shadow ${red ? 'text-rose-600' : 'text-slate-900'}`}>
       <span>{card[0] === 'T' ? '10' : card[0]}</span>
       <span>{SUIT[card[1] as keyof typeof SUIT]}</span>
     </div>
@@ -30,7 +36,7 @@ function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boole
     <div className={`flex flex-col items-center ${dimmed ? 'opacity-45' : ''}`}>
       {p.hole.length > 0 && !(p.folded && !isHero) && (
         <div className="-mb-2 flex gap-0.5">
-          {p.hole.map((c, i) => <CardView key={i} card={c} big={isHero} />)}
+          {p.hole.map((c, i) => <CardView key={i} card={c} size={isHero ? 'large' : 'seat'} />)}
         </div>
       )}
       <div
@@ -88,8 +94,14 @@ export default function PokerTable({ state, heroId, onRejoin }: Props) {
           </p>
         ) : (
           <>
-            <div className="flex gap-1">
-              {state.board.map((c, i) => <CardView key={i} card={c} big />)}
+            <div className="flex gap-1 [perspective:600px]">
+              {state.board.map((c, i) =>
+                i < 3 ? (
+                  <CardView key={`${state.handNumber}-${i}`} card={c} size="large" className="deal-flop" delayMs={i * 180} />
+                ) : (
+                  <CardView key={`${state.handNumber}-${i}`} card={c} size="large" />
+                ),
+              )}
             </div>
             {state.phase === 'showdown' ? (
               <div className="max-w-[60%] space-y-0.5 text-center text-xs text-emerald-50">

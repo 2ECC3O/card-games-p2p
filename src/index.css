@@ -26,3 +26,26 @@ body {
   animation-timing-function: linear;
   animation-fill-mode: forwards;
 }
+
+/* Flop: the three cards flip in one after another (delay set inline). */
+@keyframes deal-flop {
+  from {
+    opacity: 0;
+    transform: translateY(-3rem) rotateY(180deg) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.deal-flop {
+  animation: deal-flop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-flop {
+    animation: none;
+  }
+}
