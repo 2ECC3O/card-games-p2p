@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import type { Card, GameState } from '../types/poker';
 import {
-  addPlayer, applyAction, createGame, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startGame,
+  addPlayer, applyAction, buildPots, createGame, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startGame,
   startHand, TURN_MS,
 } from './pokerEngine';
 
@@ -52,6 +52,52 @@ const id = (s: GameState) => s.activeId!;
   const chips = Object.fromEntries(s.players.map((p) => [p.id, p.chips]));
   assert.deepEqual(chips, { p0: 300, p1: 400, p2: 700 });
   assert.equal(s.pots.length, 2);
+  assert.equal(s.players.reduce((n, p) => n + p.chips, 0), before);
+}
+
+// Four-way pots: two all-ins at different levels plus a folded player's chips.
+{
+  const pots = buildPots([
+    { id: 'a', committed: 100, folded: false }, // all-in
+    { id: 'b', committed: 300, folded: false }, // all-in
+    { id: 'c', committed: 500, folded: false },
+    { id: 'd', committed: 200, folded: true },
+    { id: 'e', committed: 500, folded: false },
+  ]);
+  assert.deepEqual(pots, [
+    { amount: 500, eligible: ['a', 'b', 'c', 'e'] }, // 100 from each of the five
+    { amount: 700, eligible: ['b', 'c', 'e'] }, // 200 from b, c, e plus d's other 100
+    { amount: 400, eligible: ['c', 'e'] },
+  ]);
+  assert.deepEqual(buildPots([{ id: 'a', committed: 0, folded: false }]), [], 'nothing in the middle yet');
+}
+
+// Side pots at showdown: a 4-way hand where the shortest all-in wins the main pot, a mid stack wins the
+// first side pot, a big stack the second side pot, and a folded player's chips stay in the pots.
+{
+  let s = dealt([1000, 150, 400, 1000]); // p0 dealer, p1 SB, p2 BB, p3 first to act
+  const hole: Record<string, Card[]> = { p0: ['2c', '7d'], p1: ['As', 'Ah'], p2: ['Ks', 'Kh'], p3: ['Qs', 'Qh'] };
+  s.players.forEach((p) => (p.hole = hole[p.id]));
+  s.deck = ['3h', '4d', '9s', 'Jc', '8d'] as Card[];
+  const before = total(s);
+  s = applyAction(s, 'p3', { type: 'raise', amount: 600 }, 1);
+  s = applyAction(s, 'p0', { type: 'call' }, 1);
+  s = applyAction(s, 'p1', { type: 'call' }, 1); // all-in 150
+  s = applyAction(s, 'p2', { type: 'call' }, 1); // all-in 400
+  assert.equal(s.phase, 'flop');
+  s = applyAction(s, 'p3', { type: 'raise', amount: 100 }, 1);
+  s = applyAction(s, 'p0', { type: 'fold' }, 1); // leaves 600 in the pots
+  assert.equal(s.phase, 'showdown', 'nobody left to bet against p3, so the board runs out');
+  assert.deepEqual(
+    s.pots.map((p) => [p.amount, p.eligible, p.winners]),
+    [
+      [600, ['p1', 'p2', 'p3'], ['p1']], // 150 x 4
+      [750, ['p2', 'p3'], ['p2']], // 250 from p2, p3, p0
+      [400, ['p3'], ['p3']], // p3's uncalled 100 went back; 200 each from p3 and p0 above 400
+    ],
+  );
+  const chips = Object.fromEntries(s.players.map((p) => [p.id, p.chips]));
+  assert.deepEqual(chips, { p0: 400, p1: 600, p2: 750, p3: 800 });
   assert.equal(s.players.reduce((n, p) => n + p.chips, 0), before);
 }
 

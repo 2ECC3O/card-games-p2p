@@ -1,7 +1,9 @@
-import { QRCodeSVG } from 'qrcode.react';
+import { QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import ActionControls from './components/ActionControls';
+import InviteCard from './components/InviteCard';
 import PokerTable from './components/PokerTable';
+import { button, field, label } from './components/ui';
 import { BETTING_PHASES, type BlindLevel, type GameState, type PlayerAction, type TableConfig } from './types/poker';
 import { createGame } from './engine/pokerEngine';
 import { useAudio } from './hooks/useAudio';
@@ -31,28 +33,36 @@ function parseBlinds(text: string): BlindLevel[] | null {
   return levels as BlindLevel[];
 }
 
+const DEFAULT_BLINDS = '10/20, 20/40, 30/60, 50/100, 100/200, 200/400, 500/1000';
+const PACES = [
+  { id: 'fast', label: 'Fast', hands: 5 },
+  { id: 'standard', label: 'Standard', hands: 10 },
+  { id: 'slow', label: 'Slow', hands: 20 },
+  { id: 'custom', label: 'Custom', hands: 0 },
+] as const;
+type Pace = (typeof PACES)[number]['id'];
+
 const joinUrl = (code: string) => `${location.origin}${location.pathname}?room=${code}`;
-const input =
-  'w-full rounded-lg border border-white/15 bg-slate-800 px-3 py-2.5 text-white outline-none focus:border-emerald-400';
-const label = 'mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400';
 
 export default function App() {
   const urlRoom = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
   const [name, setName] = useState(() => localStorage.getItem('poker.name') ?? '');
   const [code, setCode] = useState(urlRoom);
   const [stack, setStack] = useState('1000');
-  const [blinds, setBlinds] = useState('10/20, 20/40, 30/60, 50/100, 100/200, 200/400, 500/1000');
+  const [pace, setPace] = useState<Pace>('standard');
+  const [blinds, setBlinds] = useState(DEFAULT_BLINDS);
   const [handsPerLevel, setHandsPerLevel] = useState('10');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'join' | 'create' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const [net, setNet] = useState<PokerNet | null>(null);
   const [game, setGame] = useState<GameState | null>(null);
   const [status, setStatus] = useState<NetStatus>('connecting');
-  const [toast, setToast] = useState<string | null>(null);
-  const [showInvite, setShowInvite] = useState(false);
+  const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+  const [muted, setMuted] = useState(() => localStorage.getItem('poker.muted') === '1');
   const { chime } = useAudio();
   const netRef = useRef<PokerNet | null>(null);
+  const inviteRef = useRef<HTMLDialogElement>(null);
   const autoJoined = useRef(false); // StrictMode runs mount effects twice; join once
 
   const leaveToHome = useCallback((message: string | null) => {
@@ -60,7 +70,6 @@ export default function App() {
     netRef.current = null;
     setNet(null);
     setGame(null);
-    setShowInvite(false);
     setNotice(message);
     sessionStorage.removeItem('poker.room');
     history.replaceState(null, '', location.pathname);
@@ -69,8 +78,8 @@ export default function App() {
   const events = {
     onState: setGame,
     onStatus: setStatus,
-    onError: setToast,
-    onExpired: () => leaveToHome('Room closed after 5 minutes without any action.'),
+    onError: (text: string) => setToast({ text, error: true }),
+    onExpired: () => leaveToHome('The room closed after 5 minutes without any action.'),
   };
 
   const enter = (n: PokerNet) => {
@@ -94,16 +103,17 @@ export default function App() {
     e.preventDefault();
     const player = validName();
     if (!player) return;
-    const levels = parseBlinds(blinds);
+    const custom = pace === 'custom';
+    const levels = custom ? parseBlinds(blinds) : parseBlinds(DEFAULT_BLINDS);
     const startingStack = Number(stack);
-    const hands = Number(handsPerLevel);
-    if (!levels) return setNotice('Blind levels must look like "10/20, 20/40" with big ≥ small.');
+    const hands = custom ? Number(handsPerLevel) : PACES.find((p) => p.id === pace)!.hands;
+    if (!levels) return setNotice('Write blind levels as small/big pairs, like "10/20, 20/40".');
     if (!Number.isInteger(startingStack) || startingStack < levels[0].big * 2)
-      return setNotice('Starting stack must be a whole number of at least two big blinds.');
+      return setNotice(`The starting stack must be a whole number of at least ${levels[0].big * 2} (two big blinds).`);
     if (!Number.isInteger(hands) || hands < 1) return setNotice('Hands per level must be at least 1.');
     const config: TableConfig = { startingStack, blindLevels: levels, handsPerLevel: hands };
 
-    setBusy(true);
+    setBusy('create');
     setNotice(null);
     for (let attempt = 0; attempt < 3; attempt++) {
       const roomCode = randomRoomCode();
@@ -112,23 +122,23 @@ export default function App() {
         break;
       } catch (err) {
         if ((err as { type?: string }).type !== 'unavailable-id') {
-          setNotice('Could not reach the matchmaking server. Check your connection.');
+          setNotice("Couldn't reach the matchmaking server. Check your connection and try again.");
           break;
         }
       }
     }
-    setBusy(false);
+    setBusy(null);
   };
 
   const joinRoom = async (roomCode: string, player: string) => {
-    setBusy(true);
+    setBusy('join');
     setNotice(null);
     try {
       enter(await PokerNet.join(roomCode, identity(player), events));
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Could not join the room.');
+      setNotice(err instanceof Error ? err.message : "Couldn't join the room.");
     }
-    setBusy(false);
+    setBusy(null);
   };
 
   const onJoin = (e: FormEvent) => {
@@ -155,8 +165,8 @@ export default function App() {
   const myTurn = !!game && !!net && game.activeId === net.me.id && BETTING_PHASES.includes(game.phase);
   const turnKey = myTurn ? `${game!.handNumber}-${game!.phase}-${game!.turnDeadline}` : null;
   useEffect(() => {
-    if (turnKey) chime();
-  }, [turnKey, chime]);
+    if (turnKey && !muted) chime();
+  }, [turnKey, muted, chime]);
 
   useEffect(() => {
     if (!toast) return;
@@ -166,66 +176,102 @@ export default function App() {
 
   // ------------------------------------------------ home
   if (!net || !game) {
+    const card = 'rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/10 backdrop-blur-sm sm:p-5 lg:p-6';
     return (
-      <main className="min-h-dvh bg-[radial-gradient(ellipse_at_top,#14532d_0%,#020617_65%)] px-4 py-8 text-white">
-        <div className="mx-auto max-w-md">
-          <h1 className="text-center text-4xl font-black tracking-tight">
-            Hold'em <span className="text-emerald-400">P2P</span>
-          </h1>
-          <p className="mt-1 text-center text-sm text-slate-300">
-            Free-to-play Texas Hold'em · virtual chips only · no server, just peers
-          </p>
+      <main className="min-h-dvh bg-[radial-gradient(ellipse_at_top,#14532d_0%,#020617_62%)] px-4 py-10 text-slate-50 sm:px-6 md:flex md:items-center md:py-12">
+        <div className="mx-auto grid w-full max-w-md gap-4 md:max-w-4xl md:grid-cols-2 md:items-end md:gap-8 lg:max-w-5xl lg:gap-12">
+          <div className="flex flex-col gap-4">
+            <header className="mb-2">
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                Hold'em <span className="text-emerald-400">P2P</span>
+              </h1>
+              <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
+                Texas Hold'em with friends, right in the browser. Virtual chips, no sign-up.
+              </p>
+            </header>
 
-          {notice && (
-            <div className="mt-5 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-200" role="alert">
-              {notice}
+            {notice && (
+              <p className="rise-in rounded-xl bg-amber-300/10 px-3.5 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30" role="alert">
+                {notice}
+              </p>
+            )}
+
+            <div>
+              <label className={label} htmlFor="name">
+                Display name
+              </label>
+              <input id="name" className={field} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
             </div>
-          )}
-          {busy && net === null && (
-            <div className="mt-5 text-center text-sm text-slate-300">Connecting…</div>
-          )}
 
-          <div className="mt-6">
-            <label className={label} htmlFor="name">Display name</label>
-            <input id="name" className={input} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+            <form onSubmit={onJoin} className={card} aria-busy={busy === 'join'}>
+              <h2 className="mb-3 text-lg font-semibold">Join a room</h2>
+              <label className={label} htmlFor="code">
+                Room code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="code"
+                  className={`${field} font-mono text-lg tracking-[0.3em] uppercase placeholder:font-sans placeholder:text-base placeholder:tracking-normal placeholder:normal-case`}
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="6 letters or digits"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button disabled={busy !== null} className={`${button.primary} min-h-11 shrink-0 px-5`}>
+                  {busy === 'join' ? 'Joining…' : 'Join'}
+                </button>
+              </div>
+            </form>
           </div>
 
-          <form onSubmit={onJoin} className="mt-6 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-            <h2 className="mb-3 text-lg font-bold">Join a room</h2>
-            <label className={label} htmlFor="code">Room code</label>
-            <div className="flex gap-2">
-              <input
-                id="code"
-                className={`${input} font-mono text-lg uppercase tracking-[0.3em]`}
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                autoCapitalize="characters"
-                autoComplete="off"
-              />
-              <button disabled={busy} className="rounded-lg bg-sky-500 px-5 font-bold text-slate-950 disabled:opacity-50">
-                Join
-              </button>
-            </div>
-          </form>
+          <form onSubmit={createRoom} className={card} aria-busy={busy === 'create'}>
+            <h2 className="mb-3 text-lg font-semibold">Create a room</h2>
+            <label className={label} htmlFor="stack">
+              Starting stack
+            </label>
+            <input id="stack" className={`${field} font-mono`} inputMode="numeric" value={stack} onChange={(e) => setStack(e.target.value)} />
 
-          <form onSubmit={createRoom} className="mt-4 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-            <h2 className="mb-3 text-lg font-bold">Create a room</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={label} htmlFor="stack">Starting stack</label>
-                <input id="stack" className={input} inputMode="numeric" value={stack} onChange={(e) => setStack(e.target.value)} />
+            <fieldset className="mt-4">
+              <legend className={label}>Blind speed</legend>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-950/60 p-1 ring-1 ring-white/10 sm:grid-cols-4">
+                {PACES.map((p) => (
+                  <label key={p.id} className="relative">
+                    <input type="radio" name="pace" value={p.id} checked={pace === p.id} onChange={() => setPace(p.id)} className="peer sr-only" />
+                    <span className="block cursor-pointer rounded-lg py-2 text-center text-sm font-medium text-slate-300 transition peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-300 hover:text-slate-50 peer-checked:hover:text-slate-900">
+                      {p.label}
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div>
-                <label className={label} htmlFor="hpl">Hands per level</label>
-                <input id="hpl" className={input} inputMode="numeric" value={handsPerLevel} onChange={(e) => setHandsPerLevel(e.target.value)} />
+              <p className="mt-2 text-sm text-slate-400">
+                {pace === 'custom'
+                  ? 'Set your own blind levels and how often they go up.'
+                  : `Blinds start at 10/20 and go up every ${PACES.find((p) => p.id === pace)!.hands} hands.`}
+              </p>
+            </fieldset>
+
+            {pace === 'custom' && (
+              <div className="rise-in mt-3 grid gap-3">
+                <div>
+                  <label className={label} htmlFor="hpl">
+                    Hands per level
+                  </label>
+                  <input id="hpl" className={`${field} font-mono`} inputMode="numeric" value={handsPerLevel} onChange={(e) => setHandsPerLevel(e.target.value)} />
+                </div>
+                <div>
+                  <label className={label} htmlFor="blinds">
+                    Blind levels (small/big)
+                  </label>
+                  <textarea id="blinds" rows={2} className={`${field} font-mono text-sm`} value={blinds} onChange={(e) => setBlinds(e.target.value)} />
+                </div>
               </div>
-            </div>
-            <label className={`${label} mt-3`} htmlFor="blinds">Blind levels (small/big)</label>
-            <textarea id="blinds" rows={2} className={input} value={blinds} onChange={(e) => setBlinds(e.target.value)} />
-            <button disabled={busy} className="mt-3 w-full rounded-lg bg-emerald-500 py-3 font-bold text-slate-950 disabled:opacity-50">
-              Create room
+            )}
+
+            <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
+              {busy === 'create' ? 'Creating room…' : 'Create room'}
             </button>
           </form>
         </div>
@@ -235,98 +281,137 @@ export default function App() {
 
   // ------------------------------------------------ table
   const isHost = net.role === 'host';
+  const me = game.players.find((p) => p.id === net.me.id);
+  const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
+  const outOfChips = game.started && (!me || (me.chips === 0 && !BETTING_PHASES.includes(game.phase)));
   const seated = game.players.filter((p) => p.chips > 0).length;
   const url = joinUrl(game.roomCode);
-  const statusColor = { hosting: 'bg-emerald-400', connected: 'bg-emerald-400', connecting: 'bg-amber-400', reconnecting: 'bg-rose-500 animate-pulse' }[status];
+  const statusColor = { hosting: 'bg-emerald-400', connected: 'bg-emerald-400', connecting: 'bg-amber-300', reconnecting: 'bg-rose-400' }[status];
   const act = (action: PlayerAction) => net.act(action);
   const share = async () => {
     try {
       if (navigator.share) await navigator.share({ title: "Hold'em P2P", text: `Join my poker room ${game.roomCode}`, url });
       else {
         await navigator.clipboard.writeText(url);
-        setToast('Invite link copied');
+        setToast({ text: 'Invite link copied', error: false });
       }
     } catch {
       /* share sheet dismissed */
     }
   };
+  const toggleMute = () => {
+    localStorage.setItem('poker.muted', muted ? '0' : '1');
+    setMuted(!muted);
+  };
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_at_center,#1e293b_0%,#020617_75%)] text-white">
-      <header className="flex items-center gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 text-sm">
-        <button onClick={() => setShowInvite(true)} className="flex items-center gap-2 rounded-lg bg-slate-800 px-2.5 py-1.5">
-          <span className={`size-2 rounded-full ${statusColor}`} title={status} />
-          <span className="font-mono font-bold tracking-widest">{game.roomCode}</span>
-          <span className="text-slate-400">Invite</span>
+    <main className="flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_at_center,#1e293b_0%,#020617_75%)] text-slate-50">
+      <header className="flex items-center gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 sm:px-5 sm:pt-3">
+        <button onClick={() => inviteRef.current?.showModal()} className={`${button.quiet} min-h-10 px-3`}>
+          <span className={`size-2 rounded-full ${statusColor}`} aria-hidden />
+          <span className="sr-only">Connection: {status}. </span>
+          <span className="font-mono tracking-widest">{game.roomCode}</span>
+          <QrCodeIcon size={18} aria-hidden />
+          <span className="sr-only sm:not-sr-only">Invite</span>
         </button>
-        <div className="min-w-0 flex-1 truncate text-center text-xs text-slate-300">
-          {game.handNumber > 0 && `Hand ${game.handNumber} · Blinds ${game.blinds.small}/${game.blinds.big}`}
-          {status === 'reconnecting' && <span className="text-rose-300"> · Reconnecting…</span>}
+
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center text-xs leading-tight text-slate-400 sm:flex-row sm:gap-4 sm:text-sm">
+          {status === 'reconnecting' ? (
+            <span className="rounded-full bg-rose-400/15 px-2.5 py-0.5 text-rose-200">Reconnecting…</span>
+          ) : (
+            game.handNumber > 0 && (
+              <>
+                <span>Hand {game.handNumber}</span>
+                <span>
+                  Blinds <span className="font-mono text-slate-200">{game.blinds.small}/{game.blinds.big}</span>
+                </span>
+              </>
+            )
+          )}
         </div>
+
+        <button onClick={toggleMute} className={`${button.quiet} size-10`} aria-pressed={muted} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
+          {muted ? <SpeakerSlashIcon size={18} aria-hidden /> : <SpeakerHighIcon size={18} aria-hidden />}
+        </button>
         <button
           onClick={() => {
             net.leave(); // tears itself down after the goodbye is sent
             netRef.current = null;
             leaveToHome(null);
           }}
-          className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-slate-300"
+          className={`${button.quiet} min-h-10 px-3`}
+          aria-label="Leave room"
         >
-          Leave
+          <SignOutIcon size={18} aria-hidden />
+          <span className="hidden sm:inline">Leave</span>
         </button>
       </header>
 
-      <section className="relative min-h-0 flex-1 px-1">
-        <PokerTable state={game} heroId={net.me.id} onRejoin={() => net.rejoinQueue()} />
+      <section className="relative min-h-0 flex-1 px-1 sm:px-4" aria-label="Poker table">
+        <PokerTable
+          state={game}
+          heroId={net.me.id}
+          invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
+        />
       </section>
 
       <footer className="min-h-[4.5rem] pt-1">
         {myTurn ? (
           <ActionControls key={`${game.handNumber}-${game.phase}-${game.turnDeadline}`} state={game} heroId={net.me.id} onAction={act} />
         ) : isHost && !game.started ? (
-          <div className="mx-auto max-w-xl px-3 pb-3">
-            <button
-              disabled={seated < 2}
-              onClick={() => net.startGame()}
-              className="min-h-12 w-full rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:opacity-40"
-            >
-              {seated < 2 ? 'Waiting for at least 2 players…' : `Start game (${seated} players)`}
+          <div className="mx-auto max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            <button disabled={seated < 2} onClick={() => net.startGame()} className={`${button.primary} min-h-12 w-full text-base sm:min-h-14 sm:text-lg`}>
+              {seated < 2 ? 'Waiting for a second player' : `Start game with ${seated} players`}
+            </button>
+          </div>
+        ) : queuePos >= 0 ? (
+          <p className="px-3 pb-3 text-center text-sm text-slate-300 sm:text-base" aria-live="polite">
+            You're number {queuePos + 1} in the queue. You'll be dealt in when a seat opens.
+          </p>
+        ) : outOfChips ? (
+          <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            <p className="text-sm text-slate-300 sm:text-base">You're out of chips.</p>
+            <button onClick={() => net.rejoinQueue()} className={`${button.primary} min-h-11 px-5`}>
+              Rejoin with {game.config.startingStack}
             </button>
           </div>
         ) : (
-          <div className="px-3 pb-3 text-center text-sm text-slate-400">
+          <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
             {game.activeId
-              ? `Waiting for ${game.players.find((p) => p.id === game.activeId)?.name ?? 'player'}…`
+              ? `Waiting for ${game.players.find((p) => p.id === game.activeId)?.name ?? 'another player'}…`
               : game.phase === 'showdown'
-                ? 'Next hand starting soon'
-                : ' '}
-          </div>
+                ? 'Next hand starts in a few seconds'
+                : !game.started
+                  ? 'Waiting for the host to start'
+                  : ''}
+          </p>
         )}
       </footer>
 
-      {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowInvite(false)}>
-          <div className="w-full max-w-xs rounded-2xl bg-slate-900 p-5 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs uppercase tracking-wide text-slate-400">Room code</div>
-            <div className="font-mono text-3xl font-black tracking-[0.3em]">{game.roomCode}</div>
-            <div className="mx-auto mt-4 w-fit rounded-xl bg-white p-3">
-              <QRCodeSVG value={url} size={180} />
-            </div>
-            <div className="mt-3 break-all text-xs text-slate-400">{url}</div>
-            <div className="mt-4 flex gap-2">
-              <button onClick={share} className="flex-1 rounded-lg bg-sky-500 py-2.5 font-bold text-slate-950">
-                Share link
-              </button>
-              <button onClick={() => setShowInvite(false)} className="flex-1 rounded-lg bg-slate-700 py-2.5 font-semibold">
-                Close
-              </button>
-            </div>
-          </div>
+      <dialog
+        ref={inviteRef}
+        onClick={(e) => e.target === e.currentTarget && e.currentTarget.close()}
+        onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.close()} // some embedded browsers skip the native Esc close
+        className="m-auto w-[min(22rem,calc(100%-2rem))] rounded-2xl bg-slate-900 p-0 text-slate-50 shadow-2xl ring-1 ring-white/10 backdrop:bg-slate-950/75 backdrop:backdrop-blur-sm"
+        aria-label="Invite players"
+      >
+        <div className="p-5">
+          <InviteCard code={game.roomCode} url={url} onShare={share}>
+            <button onClick={() => inviteRef.current?.close()} className={`${button.quiet} min-h-11 flex-1`}>
+              Close
+            </button>
+          </InviteCard>
         </div>
-      )}
+      </dialog>
 
       {toast && (
-        <div className="fixed inset-x-0 top-14 z-50 mx-auto w-fit max-w-[90vw] rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium shadow-lg" role="alert">
-          {toast}
+        <div
+          className={`rise-in fixed inset-x-0 top-16 z-50 mx-auto w-fit max-w-[90vw] rounded-xl px-4 py-2.5 text-sm font-medium shadow-lg ${
+            toast.error ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-900'
+          }`}
+          role={toast.error ? 'alert' : 'status'}
+        >
+          {toast.text}
         </div>
       )}
     </main>

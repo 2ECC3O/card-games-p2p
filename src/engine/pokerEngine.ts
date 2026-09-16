@@ -222,6 +222,23 @@ function advance(s: GameState, now: number, afterSeat: number, keepActive = fals
   advance(s, now, s.dealerSeat);
 }
 
+/**
+ * Main pot plus side pots: one pot per distinct amount put in by players still in the hand, each
+ * open to the players who put in at least that much. The last pot also sweeps up folded players'
+ * chips above the top level. Pass `committed` as chips already in the middle.
+ */
+export function buildPots(players: Pick<Player, 'id' | 'committed' | 'folded'>[]): { amount: number; eligible: string[] }[] {
+  const live = players.filter((p) => !p.folded);
+  const levels = [...new Set(live.map((p) => p.committed))].filter((l) => l > 0).sort((a, b) => a - b);
+  let prev = 0;
+  return levels.map((level, i) => {
+    const cap = i === levels.length - 1 ? Infinity : level;
+    const amount = players.reduce((sum, p) => sum + Math.min(p.committed, cap) - Math.min(p.committed, prev), 0);
+    prev = level;
+    return { amount, eligible: live.filter((p) => p.committed >= level).map((p) => p.id) };
+  });
+}
+
 function finishHand(s: GameState, now: number) {
   s.activeId = null;
   s.turnDeadline = null;
@@ -247,15 +264,9 @@ function finishHand(s: GameState, now: number) {
   const solved = new Map(live.map((p) => [p.id, Hand.solve([...p.hole, ...s.board])]));
   for (const p of live) p.showCards = true;
 
-  // One pot per distinct all-in level; the last pot also sweeps folded chips above it.
-  const levels = [...new Set(live.map((p) => p.committed))].sort((a, b) => a - b);
   const clockwise = (p: Player) => (p.seat - s.dealerSeat - 1 + MAX_SEATS) % MAX_SEATS; // odd chips go left of the button
-  let prev = 0;
-  s.pots = levels.map((level, i) => {
-    const cap = i === levels.length - 1 ? Infinity : level;
-    const amount = s.players.reduce((sum, p) => sum + Math.min(p.committed, cap) - Math.min(p.committed, prev), 0);
-    prev = level;
-    const eligible = live.filter((p) => p.committed >= level);
+  s.pots = buildPots(s.players).map(({ amount, eligible: ids }) => {
+    const eligible = live.filter((p) => ids.includes(p.id));
     const best = Hand.winners(eligible.map((p) => solved.get(p.id)!));
     const winners = eligible.filter((p) => best.includes(solved.get(p.id)!)).sort((a, b) => clockwise(a) - clockwise(b));
     const share = Math.floor(amount / winners.length);
