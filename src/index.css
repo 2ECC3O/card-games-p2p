@@ -27,8 +27,8 @@ body {
   animation-fill-mode: forwards;
 }
 
-/* Flop: the three cards flip in one after another (delay set inline). */
-@keyframes deal-flop {
+/* Board cards drop in and flip face up; cards dealt together are staggered (delay set inline). */
+@keyframes deal-card {
   from {
     opacity: 0;
     transform: translateY(-3rem) rotateY(180deg) scale(0.6);
@@ -39,13 +39,13 @@ body {
   }
 }
 
-.deal-flop {
-  animation: deal-flop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.deal-card {
+  animation: deal-card 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .deal-flop {
+  .deal-card {
     animation: none;
   }
 }

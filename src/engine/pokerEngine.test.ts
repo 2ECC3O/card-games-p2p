@@ -79,9 +79,16 @@ const id = (s: GameState) => s.activeId!;
   assert.equal(hostTick(s, 5), s, 'no-op tick returns the same object');
 }
 
-// Random play never creates or destroys chips, and busted players can rejoin.
+// A full table seats 10; the 11th player waits in the queue.
 {
-  let s = table(6);
+  const s = addPlayer(lobby(10), 'p10', 'P10', 0);
+  assert.equal(s.players.length, 10);
+  assert.deepEqual(s.queue.map((q) => q.id), ['p10']);
+}
+
+// Random play at a full 10-seat table never creates or destroys chips, and busted players can rejoin.
+{
+  let s = table(10);
   let now = 0;
   const chipsInPlay = () => s.players.reduce((n, p) => n + p.chips + p.committed, 0);
   let expected = chipsInPlay();

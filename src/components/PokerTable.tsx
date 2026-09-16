@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { BETTING_PHASES, type Card, type GameState, type Player } from '../types/poker';
 
 interface Props {
@@ -60,6 +61,11 @@ function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boole
 }
 
 export default function PokerTable({ state, heroId, onRejoin }: Props) {
+  // Board cards already on screen. Cards that arrive together (the flop, or an all-in runout) deal in one after another.
+  const shownCards = useRef(0);
+  useEffect(() => {
+    shownCards.current = state.board.length;
+  });
   const players = state.players;
   const heroIndex = Math.max(0, players.findIndex((p) => p.id === heroId));
   const ordered = [...players.slice(heroIndex), ...players.slice(0, heroIndex)]; // hero first, then clockwise
@@ -95,13 +101,15 @@ export default function PokerTable({ state, heroId, onRejoin }: Props) {
         ) : (
           <>
             <div className="flex gap-1 [perspective:600px]">
-              {state.board.map((c, i) =>
-                i < 3 ? (
-                  <CardView key={`${state.handNumber}-${i}`} card={c} size="large" className="deal-flop" delayMs={i * 180} />
-                ) : (
-                  <CardView key={`${state.handNumber}-${i}`} card={c} size="large" />
-                ),
-              )}
+              {state.board.map((c, i) => (
+                <CardView
+                  key={`${state.handNumber}-${i}`}
+                  card={c}
+                  size="large"
+                  className="deal-card"
+                  delayMs={Math.max(0, i - shownCards.current) * 180}
+                />
+              ))}
             </div>
             {state.phase === 'showdown' ? (
               <div className="max-w-[60%] space-y-0.5 text-center text-xs text-emerald-50">
@@ -121,7 +129,11 @@ export default function PokerTable({ state, heroId, onRejoin }: Props) {
 
       {ordered.map((p, i) => {
         const angle = Math.PI / 2 + (i * 2 * Math.PI) / ordered.length;
-        const at = (r: number) => ({ left: `${50 + r * 43 * Math.cos(angle)}%`, top: `${50 + r * 40 * Math.sin(angle)}%` });
+        // Narrower than the felt so side seats stay on screen. Seats near 3 or 9 o'clock would cover the
+        // board row, so they are pushed at least 35% of the vertical radius above or below it.
+        const sin = Math.sin(angle);
+        const y = Math.sign(sin || 1) * Math.max(Math.abs(sin), 0.35);
+        const at = (r: number) => ({ left: `${50 + r * 38 * Math.cos(angle)}%`, top: `${50 + r * 42 * y}%` });
         return (
           <div key={p.id}>
             <div className="absolute -translate-x-1/2 -translate-y-1/2" style={at(1)}>
