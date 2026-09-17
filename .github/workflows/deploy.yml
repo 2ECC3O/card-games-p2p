@@ -27,6 +27,10 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          # Optional relay (see src/network/iceServers.ts). Unset = direct connections only.
+          VITE_OPENRELAY_APP: ${{ vars.OPENRELAY_APP }}
+          VITE_OPENRELAY_API_KEY: ${{ secrets.OPENRELAY_API_KEY }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -1,9 +1,10 @@
-import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import Peer, { type DataConnection } from 'peerjs';
 import {
   addPlayer, applyAction, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
 } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
 import { decode, encode } from './codec';
+import { iceServers } from './iceServers';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
 // v2: messages are compressed binary (see codec.ts) instead of plain JSON.
@@ -49,18 +50,11 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const randomRoomCode = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => ALPHABET[b % ALPHABET.length]).join('');
 
-function peerOptions(): PeerOptions {
-  const env = import.meta.env;
-  const turn = env.VITE_TURN_URLS
-    ? { urls: String(env.VITE_TURN_URLS).split(',').map((u) => u.trim()), username: env.VITE_TURN_USERNAME, credential: env.VITE_TURN_CREDENTIAL }
-    : { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' };
-  return { config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, turn] } };
-}
-
 /** Resolves once registered with the signaling server; rejects with the PeerError (e.g. type "unavailable-id"). */
-function openPeer(id?: string): Promise<Peer> {
+async function openPeer(id?: string): Promise<Peer> {
+  const options = { config: { iceServers: await iceServers() } };
   return new Promise((resolve, reject) => {
-    const peer = id ? new Peer(id, peerOptions()) : new Peer(peerOptions());
+    const peer = id ? new Peer(id, options) : new Peer(options);
     const fail = (err: unknown) => {
       peer.destroy();
       reject(err);

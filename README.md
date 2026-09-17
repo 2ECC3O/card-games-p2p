@@ -84,17 +84,31 @@ files on the way. Static hosts such as Netlify and Cloudflare Pages give you HTT
 
 ### Players on mobile data or strict networks
 
-Two phones on mobile data often can't connect directly and need a relay (a TURN server). By default the
-app uses the free public Open Relay servers (`[UNVERIFIED]` whether they are still running). For reliable
-play, get TURN credentials from any TURN provider and set them before building:
+Most players connect directly. Players whose network blocks that (common on mobile data, personal
+hotspots, and hotel, school or office Wi-Fi) need a **relay** (a TURN server). The site works without one;
+those players just can't connect.
 
-```bash
-cp .env.example .env
-# then fill in:
-# VITE_TURN_URLS=turn:your.turn.host:443?transport=tcp,turn:your.turn.host:80
-# VITE_TURN_USERNAME=...
-# VITE_TURN_CREDENTIAL=...
-```
+The deployed site uses an **Open Relay** free account (by Metered, 20 GB of relay traffic a month). The
+game sends compressed messages, so a fully relayed 10-player table uses very roughly 20 MB an hour.
+
+To set it up for your own deployment:
+
+1. Sign up at https://www.metered.ca/tools/openrelay/ and create an app. Note the **app name**
+   (the `<name>` in `<name>.metered.live`) and the **API key**.
+2. Store them in the GitHub repository (the deploy workflow passes them into the build):
+   ```bash
+   gh variable set OPENRELAY_APP
+   gh secret set OPENRELAY_API_KEY
+   ```
+3. Run the **Deploy to GitHub Pages** workflow again (Actions tab), or push a commit.
+
+For a local build, put the same values in `.env` as `VITE_OPENRELAY_APP` and `VITE_OPENRELAY_API_KEY`
+(see `.env.example`). Any other TURN provider works too through `VITE_TURN_URLS`, `VITE_TURN_USERNAME`
+and `VITE_TURN_CREDENTIAL`.
+
+The API key ends up in the site's JavaScript, where anyone can read it. On the free plan the worst case is
+someone using up the monthly allowance, after which relayed players can't connect until it resets; there
+is no bill. If the relay can't be reached, the game carries on with direct connections only.
 
 ---
 
@@ -201,6 +215,7 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 | `src/types/poker.ts` | Types: cards, players, pots, game state, actions |
 | `src/engine/pokerEngine.ts` | The rules. Pure functions: deal, betting rounds, side pots (`buildPots`), showdown, turn timeouts (`hostTick`), per-player masking (`maskFor`) |
 | `src/engine/pokerEngine.test.ts` | Engine checks, run with `npm test` |
+| `src/network/iceServers.ts` | Which STUN and relay (TURN) servers browsers use, including fetching Open Relay credentials |
 | `src/network/codec.ts` | Compresses and decompresses messages between browsers |
 | `src/network/pokerNet.ts` | Host and client networking: message checks, heartbeats, standby snapshots, failover, reconnects |
 | `src/App.tsx` | Home screen (create/join), table screen header and footer, invite dialog, notices |
