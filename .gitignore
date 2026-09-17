@@ -2,3 +2,8 @@ node_modules
 dist
 .env
 .impeccable/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

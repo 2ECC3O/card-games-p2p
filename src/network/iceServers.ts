@@ -1,11 +1,8 @@
 /**
  * ICE servers for WebRTC. STUN finds each browser's public address, which is enough for most home
  * networks. A TURN relay is added for players whose networks block direct connections (often mobile
- * data, hotspots, hotel or office Wi-Fi). Configured at build time, first match wins:
- *
- * 1. VITE_TURN_URLS (+ VITE_TURN_USERNAME, VITE_TURN_CREDENTIAL): a fixed relay login.
- * 2. VITE_OPENRELAY_APP + VITE_OPENRELAY_API_KEY: fresh credentials from Open Relay (Metered).
- * 3. Neither: STUN only, so direct connections work and relayed ones don't.
+ * data, hotspots, hotel or office Wi-Fi): with VITE_OPENRELAY_APP + VITE_OPENRELAY_API_KEY set at build
+ * time, fresh credentials come from Open Relay (Metered); without them, STUN only.
  *
  * Anything baked into the build is visible in the page's JavaScript.
  */
@@ -15,10 +12,6 @@ let cached: { at: number; servers: RTCIceServer[] } | null = null;
 
 export async function iceServers(): Promise<RTCIceServer[]> {
   const env = import.meta.env;
-  if (env.VITE_TURN_URLS) {
-    const urls = String(env.VITE_TURN_URLS).split(',').map((u) => u.trim());
-    return [STUN, { urls, username: env.VITE_TURN_USERNAME, credential: env.VITE_TURN_CREDENTIAL }];
-  }
   const app = String(env.VITE_OPENRELAY_APP ?? '');
   const key = String(env.VITE_OPENRELAY_API_KEY ?? '');
   if (!/^[a-z0-9-]+$/i.test(app) || !key) return [STUN];

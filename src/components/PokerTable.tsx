@@ -115,11 +115,13 @@ function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boole
   );
 }
 
-/** A chip stack with an amount: bets in front of a seat, pots in the middle, winnings on the move. */
+const CHIP = <span className="size-4 shrink-0 rounded-full border-2 border-dashed border-amber-100 bg-amber-400 shadow-sm sm:size-5" aria-hidden />;
+
+/** A chip stack with an amount: bets in front of a seat, winnings on the move. */
 function Chips({ amount }: { amount: number }) {
   return (
     <div className="flex w-max items-center gap-1.5 rounded-full bg-slate-950/75 py-0.5 pr-2.5 pl-0.5 text-xs font-semibold text-slate-50 shadow shadow-black/40 sm:text-sm">
-      <span className="size-4 shrink-0 rounded-full border-2 border-dashed border-amber-100 bg-amber-400 shadow-sm sm:size-5" aria-hidden />
+      {CHIP}
       <span className="font-mono">{amount}</span>
     </div>
   );
@@ -160,7 +162,11 @@ export default function PokerTable({ state, heroId, invite }: Props) {
     if (old === state) return;
     if (old.handNumber !== state.handNumber) return setCollecting([]);
     if (old.phase === state.phase) return;
-    setCollecting(old.players.filter((p) => p.bet > 0).map((p) => ({ key: `${old.handNumber}-${old.phase}-${p.id}`, id: p.id, amount: p.bet })));
+    // The action that ended the round (e.g. a call) is already folded into `committed`, so add it to the old bet.
+    const finalBet = (p: Player) => p.bet + (state.players.find((n) => n.id === p.id)?.committed ?? p.committed) - p.committed;
+    setCollecting(
+      old.players.map((p) => ({ key: `${old.handNumber}-${old.phase}-${p.id}`, id: p.id, amount: finalBet(p) })).filter((c) => c.amount > 0),
+    );
   }, [state]);
 
   const players = state.players;
@@ -227,7 +233,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
                   <ul className="space-y-1 text-left text-xs sm:text-sm">
                     {state.pots.map((p, i) => (
                       <li key={i}>
-                        <span className="text-slate-400">{i === 0 ? 'Main' : state.pots.length > 2 ? `Side ${i}` : 'Side'}</span>{' '}
+                        <span className="text-slate-400">{potLabel(i, state.pots.length)}</span>{' '}
                         <span className="font-semibold text-slate-50">{winnersText(p.winners)}</span> <span className="font-mono font-semibold">{p.amount}</span>
                         {p.hand && <span className="text-emerald-200"> {p.hand}</span>}
                       </li>
@@ -244,7 +250,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
                     key={middle.map((p) => p.amount).join('-')}
                     className="pot-bump flex max-w-[44cqw] flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 rounded-2xl bg-slate-950/75 py-1 pr-3 pl-1 text-xs font-semibold text-slate-50 shadow shadow-black/40 sm:text-sm"
                   >
-                    <span className="size-4 shrink-0 rounded-full border-2 border-dashed border-amber-100 bg-amber-400 shadow-sm sm:size-5" aria-hidden />
+                    {CHIP}
                     {middle.map((p, i) => (
                       <span key={i} className="whitespace-nowrap">
                         <span className="font-medium text-slate-300">{potLabel(i, middle.length)}</span> <span className="font-mono">{p.amount}</span>

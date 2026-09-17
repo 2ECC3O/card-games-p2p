@@ -2,7 +2,6 @@ import pokersolver from 'pokersolver';
 import {
   BETTING_PHASES,
   type Card,
-  type Deck,
   type GameState,
   type Player,
   type PlayerAction,
@@ -12,13 +11,14 @@ import {
 const { Hand } = pokersolver; // CommonJS package: default import works in Vite and tsx
 
 export const MAX_SEATS = 10;
+export const MAX_QUEUE = 20;
 export const TURN_MS = 30_000;
 export const SHOWDOWN_MS = 6_000;
 export const IDLE_MS = 5 * 60_000;
 
 // ------------------------------------------------ cards
 
-export function newDeck(): Deck {
+function newDeck(): Card[] {
   return [...'23456789TJQKA'].flatMap((r) => [...'shdc'].map((s) => `${r}${s}` as Card));
 }
 
@@ -32,7 +32,7 @@ function randomInt(n: number): number {
 }
 
 /** Fisher-Yates, in place. */
-export function shuffle<T>(items: T[]): T[] {
+function shuffle<T>(items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = randomInt(i + 1);
     [items[i], items[j]] = [items[j], items[i]];
@@ -75,6 +75,16 @@ function seat(s: GameState, id: string, name: string, chips: number, connected: 
   s.players.sort((a, b) => a.seat - b.seat);
 }
 
+/**
+ * Display names as shown to everyone: invisible and control characters removed (they can reverse or hide
+ * text next to the name), whitespace trimmed, at most 20 characters. Zero-width joiners stay, so emoji
+ * sequences still render. Empty result: "Player".
+ */
+export function cleanName(name: unknown): string {
+  const text = typeof name === 'string' ? name : '';
+  return [...text.replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
+}
+
 // ------------------------------------------------ lobby
 
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
@@ -86,7 +96,10 @@ export function createGame(roomCode: string, config: TableConfig, now: number): 
 }
 
 /** Seat before the game starts; afterwards (or when full) join the queue for the next hand. */
-export function addPlayer(state: GameState, id: string, name: string, now: number): GameState {
+export function addPlayer(state: GameState, id: string, rawName: string, now: number): GameState {
+  const name = cleanName(rawName);
+  if (!find(state, id) && !state.queue.some((q) => q.id === id) && state.queue.length >= MAX_QUEUE && (state.started || state.players.length >= MAX_SEATS))
+    return state; // table and queue full
   return update(state, (s) => {
     s.lastActionAt = now;
     const known = find(s, id) ?? s.queue.find((q) => q.id === id);
@@ -111,11 +124,11 @@ export function setConnected(state: GameState, id: string, connected: boolean): 
 /** Busted players ask to be dealt back in with a fresh stack. */
 export function rejoinQueue(state: GameState, id: string, name: string, now: number): GameState {
   const p = find(state, id);
-  if (!state.started || state.queue.some((q) => q.id === id)) return state;
+  if (!state.started || state.queue.length >= MAX_QUEUE || state.queue.some((q) => q.id === id)) return state;
   if (p && (p.chips > 0 || BETTING_PHASES.includes(state.phase))) return state; // all-in is not busted
   return update(state, (s) => {
     s.lastActionAt = now;
-    s.queue.push({ id, name, connected: true });
+    s.queue.push({ id, name: cleanName(name), connected: true });
   });
 }
 
@@ -148,7 +161,7 @@ export function startGame(state: GameState, now: number): GameState {
 // ------------------------------------------------ hand flow
 
 /** Mutates. `deck` lets tests stack the deck (cards are dealt with pop()). */
-export function startHand(s: GameState, now: number, deck?: Deck) {
+export function startHand(s: GameState, now: number, deck?: Card[]) {
   s.players = s.players.filter((p) => p.chips > 0 && !p.left);
   while (s.players.length < MAX_SEATS && s.queue.length) {
     const q = s.queue.shift()!;

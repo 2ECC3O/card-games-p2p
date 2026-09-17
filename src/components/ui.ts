@@ -9,6 +9,7 @@ export const button = {
   primary: `${base} bg-emerald-400 text-emerald-950 hover:bg-emerald-300`,
   secondary: `${base} bg-slate-100 text-slate-900 hover:bg-white`,
   quiet: `${base} bg-white/8 text-slate-100 hover:bg-white/14`,
+  danger: `${base} bg-rose-600 text-white hover:bg-rose-500`,
 };
 
 export const field =

@@ -1,14 +1,16 @@
 import Peer, { type DataConnection } from 'peerjs';
 import {
-  addPlayer, applyAction, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
+  addPlayer, applyAction, cleanName, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
 } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
 import { decode, encode } from './codec';
 import { iceServers } from './iceServers';
+import { sha256 } from './sha256';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
 // v2: messages are compressed binary (see codec.ts) instead of plain JSON.
-const PREFIX = 'p2p-holdem-v2-';
+// v3: secret fingerprints in snapshots, 'closed' message, host can remove players.
+const PREFIX = 'p2p-holdem-v3-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -24,25 +26,37 @@ export interface NetEvents {
   onState(state: GameState): void;
   onStatus(status: NetStatus): void;
   onError(message: string): void;
-  onExpired(): void;
+  /** The room is gone for this player (idle timeout, or the host removed them). */
+  onClosed(message: string): void;
 }
 
-interface Member extends Identity {
+const EXPIRED = 'The room closed after 5 minutes without any action.';
+const REMOVED = 'The host removed you from this room.';
+
+/** What the host knows about each person in the room. Only a fingerprint of their secret is kept. */
+interface MemberInfo {
+  id: string;
+  name: string;
   peerId: string;
+  secretHash: string;
+}
+interface Member extends MemberInfo {
   conn: DataConnection | null;
   lastSeen: number;
   goneAt: number | null;
 }
-type MemberInfo = Pick<Member, 'id' | 'secret' | 'name' | 'peerId'>;
+/** Everything a standby needs to take over. It holds secret fingerprints, never the secrets themselves. */
 interface Snapshot {
   state: GameState;
   members: MemberInfo[];
+  removed: string[];
 }
 
 type Msg =
   | ({ t: 'hello'; peerId: string } & Identity)
   | { t: 'act'; action: PlayerAction }
-  | { t: 'rejoin' | 'leave' | 'ping' | 'pong' | 'expired' | 'promote' | 'refuse' }
+  | { t: 'rejoin' | 'leave' | 'ping' | 'pong' | 'promote' | 'refuse' }
+  | { t: 'closed'; message: string }
   | { t: 'state'; state: GameState; standbyId: string | null; snapshot?: Snapshot }
   | { t: 'reject' | 'error'; message: string };
 
@@ -77,6 +91,8 @@ export class PokerNet {
   role: 'host' | 'client' = 'client';
   private state: GameState | null = null; // host only
   private members = new Map<string, Member>(); // host only
+  private removed = new Set<string>(); // host only: ids the host took out; they can't come back
+  private promoteLinks = new WeakSet<DataConnection>(); // links this peer opened while taking over as host
   private roomPeer: Peer | null = null; // promoted host's claim on the room id
   private hostConn: DataConnection | null = null; // client only
   private lastPong = 0;
@@ -138,6 +154,20 @@ export class PokerNet {
   startGame() {
     if (this.role !== 'host' || !this.state) return;
     this.state = startGame(this.state, Date.now());
+    this.broadcast();
+  }
+
+  /** Host only: take a player out of the room. They are told, and can't rejoin with the same identity. */
+  remove(id: string) {
+    if (this.role !== 'host' || !this.state || id === this.me.id) return;
+    const conn = this.members.get(id)?.conn;
+    this.removed.add(id);
+    this.members.delete(id);
+    if (conn) {
+      this.send(conn, { t: 'closed', message: REMOVED });
+      setTimeout(() => conn.close(), 500);
+    }
+    this.state = removePlayer(this.state, id, Date.now());
     this.broadcast();
   }
 
@@ -224,22 +254,33 @@ export class PokerNet {
     }
 
     const before = this.state!;
-    for (const m of this.members.values()) {
-      if (m.id === this.me.id) continue;
-      if (m.conn && now - m.lastSeen > DEAD_MS) {
-        m.conn.close();
-        this.markGone(m, now);
+    // Guarded: one unexpected error must not stop the clock, or the room would freeze for everyone.
+    try {
+      for (const m of this.members.values()) {
+        if (m.id === this.me.id) continue;
+        if (m.conn && now - m.lastSeen > DEAD_MS) {
+          m.conn.close();
+          this.markGone(m, now);
+        }
+        if (m.goneAt !== null && now - m.goneAt > GRACE_MS) {
+          this.members.delete(m.id);
+          this.state = removePlayer(this.state!, m.id, now);
+        }
       }
-      if (m.goneAt !== null && now - m.goneAt > GRACE_MS) {
-        this.members.delete(m.id);
-        this.state = removePlayer(this.state!, m.id, now);
-      }
+      this.state = hostTick(this.state!, now);
+    } catch (err) {
+      console.error('Host tick failed; trying again next tick:', err);
     }
-    this.state = hostTick(this.state!, now);
-    if (now - this.state.lastActionAt > IDLE_MS) {
-      for (const m of this.members.values()) this.send(m.conn, { t: 'expired' });
-      this.events.onExpired();
-      return this.destroy();
+    if (now - this.state!.lastActionAt > IDLE_MS) {
+      for (const m of this.members.values()) this.send(m.conn, { t: 'closed', message: EXPIRED });
+      // Sending is asynchronous (compression), and the app tears the connection down as soon as it hears the room
+      // closed. So stop ticking now, and only report the close (and destroy) once the goodbyes have gone out.
+      this.destroyed = true;
+      setTimeout(() => {
+        this.events.onClosed(EXPIRED);
+        this.destroy();
+      }, 300);
+      return;
     }
     if (this.state !== before) this.broadcast();
   }
@@ -292,9 +333,9 @@ export class PokerNet {
         if (this.pendingJoin) return this.pendingJoin.reject(Object.assign(new Error(msg.message), { rejected: true }));
         this.events.onError(msg.message);
         return;
-      case 'expired':
+      case 'closed':
         if (conn !== this.hostConn) return;
-        this.events.onExpired();
+        this.events.onClosed(typeof msg.message === 'string' ? msg.message.slice(0, 200) : EXPIRED);
         return this.destroy();
       case 'promote':
         // A standby took over. Only follow it if our own host has really gone quiet.
@@ -311,6 +352,7 @@ export class PokerNet {
   private promote() {
     const snap = this.snapshot!;
     this.snapshot = null;
+    this.removed = new Set(snap.removed);
     this.hostConn?.close();
     this.hostConn = null;
     this.promoted = true;
@@ -324,6 +366,7 @@ export class PokerNet {
       if (m.id === this.me.id) continue;
       m.goneAt = now;
       const conn = this.peer.connect(m.peerId, { reliable: true, serialization: 'raw' });
+      this.promoteLinks.add(conn);
       this.wire(conn);
       conn.on('open', () => this.send(conn, { t: 'promote' }));
     }
@@ -348,6 +391,7 @@ export class PokerNet {
   private demote() {
     for (const m of this.members.values()) m.conn?.close();
     this.members.clear();
+    this.removed.clear();
     this.roomPeer?.destroy();
     this.roomPeer = null;
     this.state = null;
@@ -363,7 +407,8 @@ export class PokerNet {
     const now = Date.now();
     this.role = 'host';
     this.members = new Map(members.map((m) => [m.id, { ...m, conn: null, lastSeen: now, goneAt: null }]));
-    this.members.set(this.me.id, { ...this.me, peerId: this.peer.id, conn: null, lastSeen: now, goneAt: null });
+    const self = { id: this.me.id, name: this.me.name, peerId: this.peer.id, secretHash: sha256(this.me.secret) };
+    this.members.set(this.me.id, { ...self, conn: null, lastSeen: now, goneAt: null });
     this.state = addPlayer(state, this.me.id, this.me.name, now);
     this.status('hosting');
     this.broadcast();
@@ -389,22 +434,26 @@ export class PokerNet {
   private onClientMsg(conn: DataConnection, msg: Msg) {
     const now = Date.now();
     if (msg.t === 'promote') return this.send(conn, { t: 'refuse' }); // we are alive
+    // Only a player we contacted while taking over can send us back to client mode; a refuse from
+    // anyone else could otherwise knock a new host out of a room on demand.
     if (msg.t === 'refuse') {
-      if (this.promoted) this.demote();
+      if (this.promoted && this.promoteLinks.has(conn)) this.demote();
       return;
     }
     if (msg.t === 'hello') {
-      const name = typeof msg.name === 'string' ? msg.name.trim().slice(0, 20) : '';
-      if (!str(msg.id, 64) || !str(msg.secret, 128) || !str(msg.peerId, 128) || !name) return conn.close();
+      const name = cleanName(msg.name);
+      if (!str(msg.id, 64) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
       let m = this.members.get(msg.id);
       const reject = (message: string) => {
         this.send(conn, { t: 'reject', message });
         setTimeout(() => conn.close(), 500);
       };
-      if (m && m.secret !== msg.secret) return reject('That seat belongs to someone else.');
+      if (this.removed.has(msg.id)) return reject(REMOVED);
+      const secretHash = sha256(msg.secret);
+      if (m && m.secretHash !== secretHash) return reject('That seat belongs to someone else.');
       if (!m) {
         if (this.members.size >= MAX_MEMBERS) return reject('This room is full.');
-        m = { id: msg.id, secret: msg.secret, name, peerId: msg.peerId, conn: null, lastSeen: now, goneAt: null };
+        m = { id: msg.id, secretHash, name, peerId: msg.peerId, conn: null, lastSeen: now, goneAt: null };
         this.members.set(m.id, m);
       }
       if (m.conn && m.conn !== conn) m.conn.close();
@@ -445,10 +494,10 @@ export class PokerNet {
     const state = this.state!;
     const connected = (id: string) => id !== this.me.id && !!this.members.get(id)?.conn?.open;
     const standbyId = [...state.players.map((p) => p.id), ...state.queue.map((q) => q.id)].find(connected) ?? null;
-    const members = [...this.members.values()].map(({ id, secret, name, peerId }) => ({ id, secret, name, peerId }));
+    const members = [...this.members.values()].map(({ id, name, peerId, secretHash }) => ({ id, name, peerId, secretHash }));
     for (const m of this.members.values()) {
       if (m.id === this.me.id) continue;
-      const snapshot = m.id === standbyId ? { state, members } : undefined;
+      const snapshot = m.id === standbyId ? { state, members, removed: [...this.removed] } : undefined;
       this.send(m.conn, { t: 'state', state: maskFor(state, m.id), standbyId, snapshot });
     }
     if (!this.destroyed) this.events.onState(maskFor(state, this.me.id));

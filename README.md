@@ -6,37 +6,75 @@ everyone else connects to it directly (peer to peer).
 
 Works on phones, tablets and desktop browsers.
 
-**Play it here: https://2ecc3o.github.io/holdem-p2p/**
+There are two ways to use it:
+
+| I want to... | Do this |
+|---|---|
+| **Play right now** | Open **https://2ecc3o.github.io/holdem-p2p/**. Nothing to install, no account. |
+| **Run or change the code on my own computer** | Follow [Run it on your own computer](#run-it-on-your-own-computer) (needs a few free tools). |
 
 ---
 
-## Quick start
+## Play right now
 
-You need [Node.js](https://nodejs.org) 20.19+ or 22.12+.
+1. Open **https://2ecc3o.github.io/holdem-p2p/** in Safari, Chrome, Firefox or Edge.
+2. **To start a table:** type your name, choose a starting stack and blind speed, and press **Create room**.
+3. **To invite friends:** share the **room code**, the **invite link** or the **QR code**. They're on the
+   table before the game starts, and behind the room code button at the top left afterwards.
+4. **Your friends** open the link (or the page, then type the code), enter their name and press **Join**.
+   They can be anywhere: same Wi-Fi, another house, or on mobile data.
+5. When at least 2 players are in, the room creator presses **Start game**.
 
+Keep the page open while you play. The game runs in the players' browsers, so if everyone closes the page,
+the room ends. See [How to play](#how-to-play) for the rules and controls.
+
+---
+
+## Run it on your own computer
+
+You only need this if you want to change the game or host your own copy. To just play, use the link above.
+
+**1. Install the tools (once):**
+- [Node.js](https://nodejs.org), version 20.19 or newer. The "LTS" download is fine.
+- [Git](https://git-scm.com/downloads), to download the code (optional: see step 2).
+
+**2. Download the code.** Either:
+- open a terminal and run:
+  ```bash
+  git clone https://github.com/2ECC3O/holdem-p2p.git
+  ```
+  ```bash
+  cd holdem-p2p
+  ```
+- or, without Git: on https://github.com/2ECC3O/holdem-p2p press **Code > Download ZIP**, unzip it, and
+  open a terminal in the unzipped folder.
+
+**3. Install and start it:**
 ```bash
 npm install
+```
+```bash
 npm run dev
 ```
 
-Open http://localhost:5173, enter a name, and press **Create room**. That tab is now the host.
+**4. Open http://localhost:5173** in your browser. The game reloads by itself when you edit the code.
+Press `Ctrl+C` in the terminal to stop it.
 
 Other commands:
 
 ```bash
-npm test         # engine self-checks (dealing, betting rules, side pots, chip conservation)
-npm run build    # type-check and build the static site into dist/
+npm test         # engine and codec self-checks (dealing, betting rules, side pots, chip conservation)
+npm run build    # type-check and build the finished site into dist/
 npm run preview  # serve the built dist/ locally
 ```
 
 ---
 
-## Playing with other people
+## Hosting your own copy
 
-Everyone opens the same web page. The host shares the **room code**, the **invite link** or the **QR code**
-(tap the room code at the top left, or use the panel shown on the table before the game starts).
+Your local copy from the steps above only runs on your computer. To play it with other people:
 
-### On the same Wi-Fi (quickest way to try it)
+### On the same Wi-Fi, straight from your computer
 
 1. Start the dev server so other devices can reach it:
    ```bash
@@ -103,8 +141,7 @@ To set it up for your own deployment:
 3. Run the **Deploy to GitHub Pages** workflow again (Actions tab), or push a commit.
 
 For a local build, put the same values in `.env` as `VITE_OPENRELAY_APP` and `VITE_OPENRELAY_API_KEY`
-(see `.env.example`). Any other TURN provider works too through `VITE_TURN_URLS`, `VITE_TURN_USERNAME`
-and `VITE_TURN_CREDENTIAL`.
+(see `.env.example`).
 
 The API key ends up in the site's JavaScript, where anyone can read it. On the free plan the worst case is
 someone using up the monthly allowance, after which relayed players can't connect until it resets; there
@@ -154,6 +191,9 @@ Things phones do differently:
 - **Out of chips:** press **Rejoin** to go back into the queue with a fresh starting stack.
 - **Leaving and reloading:** reloading the tab puts you back in the same seat if you return within
   60 seconds. **Leave** gives up your seat.
+- **Removing someone (room creator only):** tap the room code at the top left, then **Remove** next to their
+  name in the **Players** list and tap again to confirm. They're taken out of the room (folded if a hand is
+  running) and can't rejoin it from that browser tab.
 - A room closes after 5 minutes without any player action.
 
 ---
@@ -164,14 +204,15 @@ Things phones do differently:
 
 - **PeerJS** handles the connections. Its free public server is only used to introduce browsers to each
   other (signaling); the game itself travels directly between browsers over WebRTC data channels.
-- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v2-<ROOM CODE>`,
+- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v3-<ROOM CODE>`,
   runs the game engine, and is the only one allowed to change the game state.
 - **Clients** send their actions (fold, call, raise, rejoin, leave) to the host. The host checks them
   against the rules and sends every player their own view of the new state.
 - **Messages are compressed** (JSON packed with the browser's built-in `CompressionStream`, see
   `src/network/codec.ts`). A 10-player game state shrinks from about 5.5 KB to under 1 KB, which keeps
   relay (TURN) usage and mobile data low: measured at roughly 40 KB per player per hand, both directions,
-  including network overhead.
+  including network overhead. Messages over 64 KB compressed or 1 MB unpacked are dropped, so nobody can
+  crash a tab with a "decompression bomb".
 
 ### Keeping cards secret
 
@@ -180,7 +221,8 @@ the deck is removed. Hole cards are only revealed at a showdown.
 
 One exception, by design: the **standby** (below) receives the full state so it can take over the hand.
 Someone in that seat with browser dev tools open could peek at other players' cards. That trade-off comes
-with peer-to-peer failover.
+with peer-to-peer failover. The standby's copy holds only fingerprints of players' reconnect secrets, never
+the secrets themselves, so it can't be used to take over someone else's seat.
 
 ### If the host disconnects
 
@@ -190,14 +232,16 @@ with peer-to-peer failover.
 - If the host is silent for 6 seconds, the standby promotes itself: it loads the snapshot, contacts every
   player directly, and keeps trying to take over the room code so new players can still join.
 - A player whose own host is still answering refuses the promotion, which sends a mistaken standby back
-  to being a normal player.
+  to being a normal player. Only players the new host contacted itself can do that.
 - Players who drop out keep their seat for 60 seconds. After that they are removed from the table.
 
 ### Identity and reconnecting
 
 Each tab gets a random id and secret, stored in `sessionStorage`. Reloading the tab sends the same id and
 secret, so the host puts you back in your seat. Someone else can't take your seat with your id, because
-the secret won't match. Your display name and mute setting are kept in `localStorage`.
+the secret won't match. The host keeps only a SHA-256 fingerprint of each secret (`src/network/sha256.ts`,
+plain JavaScript so it also works on `http://` pages). Your display name and mute setting are kept in
+`localStorage`. Names are cleaned of invisible and text-reversing characters before anyone sees them.
 
 ### Rules the engine follows
 
@@ -218,9 +262,11 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 |---|---|
 | `src/types/poker.ts` | Types: cards, players, pots, game state, actions |
 | `src/engine/pokerEngine.ts` | The rules. Pure functions: deal, betting rounds, side pots (`buildPots`), showdown, turn timeouts (`hostTick`), per-player masking (`maskFor`) |
-| `src/engine/pokerEngine.test.ts` | Engine checks, run with `npm test` |
+| `src/engine/pokerEngine.test.ts` | Engine checks (rules, side pots, hand rankings, names), run with `npm test` |
 | `src/network/iceServers.ts` | Which STUN and relay (TURN) servers browsers use, including fetching Open Relay credentials |
-| `src/network/codec.ts` | Compresses and decompresses messages between browsers |
+| `src/network/codec.ts` | Compresses and decompresses messages between browsers, with size limits |
+| `src/network/sha256.ts` | SHA-256, for fingerprinting reconnect secrets |
+| `src/network/network.test.ts` | Checks for the codec, its size limits and SHA-256, run with `npm test` |
 | `src/network/pokerNet.ts` | Host and client networking: message checks, heartbeats, standby snapshots, failover, reconnects |
 | `src/App.tsx` | Home screen (create/join), table screen header and footer, invite dialog, notices |
 | `src/components/PokerTable.tsx` | The table: seats around the felt, board cards, chips, pots, turn timers, showdown results |
@@ -229,9 +275,9 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 | `src/components/ui.ts` | Shared button and form styles |
 | `src/hooks/useAudio.ts` | The "your turn" chime, switched on by the first tap (needed on iPhones) |
 | `src/hooks/useWakeLock.ts` | Keeps the screen on while at a table |
-| `src/inAppBrowser.ts` | Detects social apps' built-in browsers for the "open in your browser" notice |
 | `src/index.css` | Fonts, Tailwind setup and the animations (card deals, chips, pots) |
 | `.github/workflows/deploy.yml` | Tests, builds and publishes the site to GitHub Pages on every push to `main` |
+| `.github/dependabot.yml` | Keeps the workflow's pinned actions up to date |
 
 Built with React 18, TypeScript, Vite, Tailwind CSS 4, PeerJS, `pokersolver`, `qrcode.react`,
 Phosphor icons and the Geist font (bundled with the app, no external font requests).
@@ -244,6 +290,7 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 |---|---|
 | Seats per table | 10 (`MAX_SEATS`) |
 | People in a room, seated plus queued | 30 (`MAX_MEMBERS`) |
+| Waiting queue | 20 (`MAX_QUEUE`) |
 | Time per turn | 30 s (`TURN_MS`) |
 | Pause after a showdown | 6 s (`SHOWDOWN_MS`) |
 | Room closes after no player action for | 5 min (`IDLE_MS`) |
@@ -255,7 +302,7 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 - **Rules or payouts:** edit `pokerEngine.ts`, then add or update a check in `pokerEngine.test.ts` and run
   `npm test`. The random-play check at a full 10-seat table catches chips being created or lost.
 - **Message format:** clients and the host must run the same version. If you change messages in
-  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v2-`) so old and new
+  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v3-`) so old and new
   versions can't join each other's rooms.
 - **Look and layout:** everything is Tailwind classes in the components. `tall:` in class names means "wide
   and tall screen" (defined in `index.css`), used so short laptop screens keep the mid-size table.
@@ -265,3 +312,31 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 Keyboard focus is visible on every control, the invite popup is a native `<dialog>` (Escape closes it and
 focus stays inside), whose turn it is is announced to screen readers, and all animations are switched off
 when the device is set to reduce motion.
+
+---
+
+## Security notes
+
+This is a game for friends with virtual chips, and there is no server to trust, so some limits come with the
+design:
+
+- **Anyone with the room code can join.** Codes are random (6 characters), but share them only with people
+  you want at the table. The room creator can remove players, though someone determined could come back
+  from a new browser tab.
+- **The host's browser runs the game**, so a host who edits the page's code could cheat. The standby
+  player can see all cards (see [Keeping cards secret](#keeping-cards-secret)).
+- **The relay API key is visible** in the site's JavaScript (see
+  [Players on mobile data or strict networks](#players-on-mobile-data-or-strict-networks)).
+
+What is protected: seats can't be taken over without their secret, messages are size-limited and checked
+before use, shuffling uses the browser's cryptographic random numbers, and players only receive their own
+hole cards. The deploy workflow pins every action to an exact commit, and Dependabot alerts are on.
+
+Found a problem? Open an issue on GitHub.
+
+---
+
+## License
+
+The code is released under the [MIT License](LICENSE). The bundled Geist and Geist Mono fonts are under the
+SIL Open Font License 1.1, and each dependency keeps its own license (all permissive: MIT or ISC).

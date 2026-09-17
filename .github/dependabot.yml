@@ -1,0 +1,8 @@
+# Keeps the commit-pinned actions in deploy.yml up to date with pull requests (security alerts for npm
+# packages are turned on in the repository settings).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

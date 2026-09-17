@@ -2,7 +2,6 @@ export type Suit = 's' | 'h' | 'd' | 'c';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'T' | 'J' | 'Q' | 'K' | 'A';
 /** pokersolver notation ("As", "Td"); "??" is a card hidden from this viewer. */
 export type Card = `${Rank}${Suit}` | '??';
-export type Deck = Card[];
 
 export type HandPhase = 'waiting' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
 export const BETTING_PHASES: HandPhase[] = ['preflop', 'flop', 'turn', 'river'];
@@ -74,7 +73,7 @@ export interface GameState {
   queue: QueuedPlayer[];
   board: Card[];
   /** Host only; stripped from every view. */
-  deck: Deck;
+  deck: Card[];
   /** Filled at showdown. */
   pots: Pot[];
   currentBet: number;

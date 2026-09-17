@@ -4,11 +4,10 @@ import ActionControls from './components/ActionControls';
 import InviteCard from './components/InviteCard';
 import PokerTable from './components/PokerTable';
 import { button, field, label } from './components/ui';
-import { BETTING_PHASES, type BlindLevel, type GameState, type PlayerAction, type TableConfig } from './types/poker';
+import { BETTING_PHASES, type BlindLevel, type GameState, type TableConfig } from './types/poker';
 import { createGame } from './engine/pokerEngine';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
-import { isInAppBrowser } from './inAppBrowser';
 import { PokerNet, randomRoomCode, type Identity, type NetStatus } from './network/pokerNet';
 
 const randomHex = (bytes: number) =>
@@ -44,6 +43,13 @@ const PACES = [
 ] as const;
 type Pace = (typeof PACES)[number]['id'];
 
+/**
+ * Browsers built into social apps (Instagram, Facebook/Messenger, LINE, Snapchat, TikTok, WeChat, Android app
+ * web views) can block peer-to-peer connections, so those players are asked to open the page in a real
+ * browser. Best-effort user-agent check; add patterns if players report other apps.
+ */
+const IN_APP_BROWSER = /FBAN|FBAV|FB_IAB|Instagram|\bLine\/|Snapchat|TikTok|musical_ly|Bytedance|MicroMessenger|; wv\)/i;
+
 const joinUrl = (code: string) => `${location.origin}${location.pathname}?room=${code}`;
 
 export default function App() {
@@ -62,7 +68,8 @@ export default function App() {
   const [status, setStatus] = useState<NetStatus>('connecting');
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
   const [muted, setMuted] = useState(() => localStorage.getItem('poker.muted') === '1');
-  const [inAppHint, setInAppHint] = useState(() => isInAppBrowser(navigator.userAgent));
+  const [inAppHint, setInAppHint] = useState(() => IN_APP_BROWSER.test(navigator.userAgent));
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null); // host: first tap on Remove
   const { chime } = useAudio();
   const netRef = useRef<PokerNet | null>(null);
   const inviteRef = useRef<HTMLDialogElement>(null);
@@ -82,7 +89,7 @@ export default function App() {
     onState: setGame,
     onStatus: setStatus,
     onError: (text: string) => setToast({ text, error: true }),
-    onExpired: () => leaveToHome('The room closed after 5 minutes without any action.'),
+    onClosed: (message: string) => leaveToHome(message),
   };
 
   const enter = (n: PokerNet) => {
@@ -173,6 +180,12 @@ export default function App() {
 
   // Keep the phone screen on while at a table; a locked screen pauses the page and costs turns.
   useWakeLock(!!net && !!game);
+
+  useEffect(() => {
+    if (!confirmRemove) return;
+    const t = setTimeout(() => setConfirmRemove(null), 3000);
+    return () => clearTimeout(t);
+  }, [confirmRemove]);
 
   useEffect(() => {
     if (!toast) return;
@@ -305,7 +318,6 @@ export default function App() {
   const seated = game.players.filter((p) => p.chips > 0).length;
   const url = joinUrl(game.roomCode);
   const statusColor = { hosting: 'bg-emerald-400', connected: 'bg-emerald-400', connecting: 'bg-amber-300', reconnecting: 'bg-rose-400' }[status];
-  const act = (action: PlayerAction) => net.act(action);
   const share = async () => {
     try {
       if (navigator.share) await navigator.share({ title: "Hold'em P2P", text: `Join my poker room ${game.roomCode}`, url });
@@ -375,7 +387,7 @@ export default function App() {
 
       <footer className="min-h-[4.5rem] pt-1">
         {myTurn ? (
-          <ActionControls key={`${game.handNumber}-${game.phase}-${game.turnDeadline}`} state={game} heroId={net.me.id} onAction={act} />
+          <ActionControls key={`${game.handNumber}-${game.phase}-${game.turnDeadline}`} state={game} heroId={net.me.id} onAction={(action) => net.act(action)} />
         ) : isHost && !game.started ? (
           <div className="mx-auto max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
             <button disabled={seated < 2} onClick={() => net.startGame()} className={`${button.primary} min-h-12 w-full text-base sm:min-h-14 sm:text-lg`}>
@@ -419,6 +431,32 @@ export default function App() {
               Close
             </button>
           </InviteCard>
+
+          {isHost && (
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <h2 className="mb-2 text-sm font-medium text-slate-300">Players</h2>
+              <ul className="max-h-56 space-y-1 overflow-y-auto">
+                {[
+                  ...game.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, place: `Seat ${p.seat + 1}` })),
+                  ...game.queue.map((q, i) => ({ id: q.id, name: q.name, place: `Queue ${i + 1}` })),
+                ].map(({ id, name, place }) => (
+                  <li key={id} className="flex min-h-10 items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{id === net.me.id ? 'You' : name}</span>
+                    <span className="text-xs text-slate-400">{place}</span>
+                    {id !== net.me.id && (
+                      // Two taps: the first arms the button for 3 seconds, the second removes.
+                      <button
+                        onClick={() => (confirmRemove === id ? (net.remove(id), setConfirmRemove(null)) : setConfirmRemove(id))}
+                        className={`${confirmRemove === id ? button.danger : button.quiet} min-h-9 px-3 text-xs`}
+                      >
+                        {confirmRemove === id ? 'Tap to remove' : 'Remove'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </dialog>
 

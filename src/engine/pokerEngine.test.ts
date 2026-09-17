@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import pokersolver from 'pokersolver';
 import type { Card, GameState } from '../types/poker';
 import {
-  addPlayer, applyAction, buildPots, createGame, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startGame,
-  startHand, TURN_MS,
+  addPlayer, applyAction, buildPots, cleanName, createGame, hostTick, legalActions, maskFor, MAX_QUEUE, MAX_SEATS,
+  rejoinQueue, removePlayer, startGame, startHand, TURN_MS,
 } from './pokerEngine';
 
 const config = { startingStack: 1000, blindLevels: [{ small: 10, big: 20 }], handsPerLevel: 10 };
@@ -172,6 +173,72 @@ const id = (s: GameState) => s.activeId!;
   s = removePlayer(s, other, 1);
   assert.equal(s.phase, 'showdown');
   assert.deepEqual(s.pots[0].winners, [s.players.find((p) => p.id !== other)!.id]);
+}
+
+// Names: invisible and text-reversing characters are removed, emoji sequences survive, 20 characters max.
+{
+  const u = (hex: string) => String.fromCodePoint(parseInt(hex, 16));
+  assert.equal(cleanName('  Amara  '), 'Amara');
+  assert.equal(cleanName('Ev' + u('202E') + 'il'), 'Evil', 'right-to-left override');
+  assert.equal(cleanName('Ze' + u('200B') + 'ro' + u('2066') + u('0000')), 'Zero', 'zero-width, isolate, NUL');
+  const family = u('1F468') + u('200D') + u('1F469');
+  assert.equal(cleanName('Fam ' + family), 'Fam ' + family, 'zero-width joiner kept');
+  assert.equal(cleanName('x'.repeat(40)).length, 20);
+  assert.equal(cleanName(u('200B') + u('200E')), 'Player');
+  assert.equal(cleanName(42), 'Player');
+  const s = addPlayer(createGame('T', config, 0), 'p0', 'Ev' + u('202E') + 'il', 0);
+  assert.equal(s.players[0].name, 'Evil', 'the engine cleans names itself');
+}
+
+// The waiting queue is capped, so a flood of joins can't grow the game state without limit.
+{
+  let s = lobby(MAX_SEATS);
+  for (let i = 0; i < MAX_QUEUE + 15; i++) s = addPlayer(s, `q${i}`, `Q${i}`, 0);
+  assert.equal(s.players.length, MAX_SEATS);
+  assert.equal(s.queue.length, MAX_QUEUE);
+  assert.equal(addPlayer(s, 'p3', 'Renamed', 1).players[3].name, 'Renamed', 'known players can still reconnect');
+}
+
+// Hand ranking (pokersolver has had no release since 2020, so pin down the rankings the game relies on).
+{
+  const { Hand } = pokersolver;
+  const board = (cards: string) => cards.split(' ');
+  const winner = (a: string, b: string) => {
+    const [ha, hb] = [Hand.solve(board(a)), Hand.solve(board(b))];
+    const w = Hand.winners([ha, hb]);
+    return w.length === 2 ? 'tie' : w[0] === ha ? 'a' : 'b';
+  };
+  const ladder = [
+    'Ah Kh Qh Jh Th 2c 3d', // royal flush
+    '9s 8s 7s 6s 5s Kd 2c', // straight flush
+    'Qc Qd Qh Qs 2d 3c 4h', // four of a kind
+    'Jc Jd Jh 4s 4d 2c 7h', // full house
+    'Ad 9d 7d 4d 2d Kc Qs', // flush
+    '9c 8d 7h 6s 5d Ac 2h', // straight
+    '7c 7d 7h Ks 2d 4c 9h', // three of a kind
+    'Kc Kd 5h 5s 2d 3c 9h', // two pair
+    'Ac Ad 9h 6s 2d 3c 8h', // one pair
+    'Ac Qd 9h 6s 2d 3c 8h', // high card
+  ];
+  for (let i = 0; i + 1 < ladder.length; i++) assert.equal(winner(ladder[i], ladder[i + 1]), 'a', `${ladder[i]} beats ${ladder[i + 1]}`);
+  assert.equal(winner('5c 4d 3h 2s Ad Kc 9h', '6c 5d 4h 3s 2d Kc 9h'), 'b', 'wheel (5-high straight) loses to 6-high straight');
+  assert.equal(winner('Ac Ad Kh 9s 2d 3c 4h', 'As Ah Qh 9c 2c 3d 4s'), 'a', 'pair of aces with king kicker');
+  assert.equal(winner('As Kd 9h 8s 7d 7c 7h', 'Ac Kh 9d 8c 7d 7c 7h'), 'tie', 'same best five cards split the pot');
+  assert.equal(Hand.solve(board('Ah Kh Qh Jh Th 2c 3d')).descr, 'Royal Flush');
+}
+
+// A tied showdown splits the pot, with the odd chip to the first winner left of the button.
+{
+  let s = dealt([1000, 1000, 1000]); // p0 dealer, p1 SB, p2 BB
+  const hole: Record<string, Card[]> = { p0: ['2c', '3d'], p1: ['Ac', 'Kd'], p2: ['As', 'Kh'] };
+  s.players.forEach((p) => (p.hole = hole[p.id]));
+  s.deck = ['4s', '5h', 'Qc', 'Jd', 'Th'] as Card[]; // board T J Q 5 4: both A-K make a broadway straight
+  s = applyAction(s, 'p0', { type: 'raise', amount: 55 }, 1);
+  s = applyAction(s, 'p1', { type: 'call' }, 1);
+  s = applyAction(s, 'p2', { type: 'call' }, 1);
+  while (s.phase !== 'showdown') s = applyAction(s, id(s), { type: 'check' }, 1);
+  assert.deepEqual(s.pots.map((p) => [p.amount, p.winners]), [[165, ['p1', 'p2']]]);
+  assert.deepEqual(s.players.map((p) => p.chips), [945, 1028, 1027], 'odd chip to p1, first left of the button');
 }
 
 console.log('pokerEngine: all checks passed');
