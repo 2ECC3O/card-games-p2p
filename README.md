@@ -88,7 +88,7 @@ Most players connect directly. Players whose network blocks that (common on mobi
 hotspots, and hotel, school or office Wi-Fi) need a **relay** (a TURN server). The site works without one;
 those players just can't connect.
 
-The deploy workflow is set up for an **Open Relay** free account (by Metered, 20 GB of relay traffic a month). The
+The live site uses an **Open Relay** free account (by Metered, 20 GB of relay traffic a month). The
 game sends compressed messages, so a fully relayed 10-player table uses very roughly 20 MB an hour.
 
 To set it up for your own deployment:
@@ -109,6 +109,10 @@ and `VITE_TURN_CREDENTIAL`.
 The API key ends up in the site's JavaScript, where anyone can read it. On the free plan the worst case is
 someone using up the monthly allowance, after which relayed players can't connect until it resets; there
 is no bill. If the relay can't be reached, the game carries on with direct connections only.
+
+Checked on the live site: the credentials request succeeds from the page, and a test connection forced
+through the relay (over UDP, and separately over TCP/TLS for networks that block UDP) delivered its
+message, with about 430 ms round trip.
 
 ---
 
