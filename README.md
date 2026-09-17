@@ -88,7 +88,7 @@ Most players connect directly. Players whose network blocks that (common on mobi
 hotspots, and hotel, school or office Wi-Fi) need a **relay** (a TURN server). The site works without one;
 those players just can't connect.
 
-The deployed site uses an **Open Relay** free account (by Metered, 20 GB of relay traffic a month). The
+The deploy workflow is set up for an **Open Relay** free account (by Metered, 20 GB of relay traffic a month). The
 game sends compressed messages, so a fully relayed 10-player table uses very roughly 20 MB an hour.
 
 To set it up for your own deployment:
