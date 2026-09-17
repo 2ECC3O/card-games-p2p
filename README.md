@@ -146,10 +146,14 @@ Things phones do differently:
 
 - **PeerJS** handles the connections. Its free public server is only used to introduce browsers to each
   other (signaling); the game itself travels directly between browsers over WebRTC data channels.
-- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v1-<ROOM CODE>`,
+- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v2-<ROOM CODE>`,
   runs the game engine, and is the only one allowed to change the game state.
 - **Clients** send their actions (fold, call, raise, rejoin, leave) to the host. The host checks them
   against the rules and sends every player their own view of the new state.
+- **Messages are compressed** (JSON packed with the browser's built-in `CompressionStream`, see
+  `src/network/codec.ts`). A 10-player game state shrinks from about 5.5 KB to under 1 KB, which keeps
+  relay (TURN) usage and mobile data low: measured at roughly 40 KB per player per hand, both directions,
+  including network overhead.
 
 ### Keeping cards secret
 
@@ -197,6 +201,7 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 | `src/types/poker.ts` | Types: cards, players, pots, game state, actions |
 | `src/engine/pokerEngine.ts` | The rules. Pure functions: deal, betting rounds, side pots (`buildPots`), showdown, turn timeouts (`hostTick`), per-player masking (`maskFor`) |
 | `src/engine/pokerEngine.test.ts` | Engine checks, run with `npm test` |
+| `src/network/codec.ts` | Compresses and decompresses messages between browsers |
 | `src/network/pokerNet.ts` | Host and client networking: message checks, heartbeats, standby snapshots, failover, reconnects |
 | `src/App.tsx` | Home screen (create/join), table screen header and footer, invite dialog, notices |
 | `src/components/PokerTable.tsx` | The table: seats around the felt, board cards, chips, pots, turn timers, showdown results |
@@ -231,7 +236,7 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 - **Rules or payouts:** edit `pokerEngine.ts`, then add or update a check in `pokerEngine.test.ts` and run
   `npm test`. The random-play check at a full 10-seat table catches chips being created or lost.
 - **Message format:** clients and the host must run the same version. If you change messages in
-  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (`p2p-holdem-v1-`) so old and new
+  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v2-`) so old and new
   versions can't join each other's rooms.
 - **Look and layout:** everything is Tailwind classes in the components. `tall:` in class names means "wide
   and tall screen" (defined in `index.css`), used so short laptop screens keep the mid-size table.

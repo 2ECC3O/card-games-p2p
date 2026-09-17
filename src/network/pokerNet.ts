@@ -3,8 +3,11 @@ import {
   addPlayer, applyAction, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
 } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
+import { decode, encode } from './codec';
 
-const PREFIX = 'p2p-holdem-v1-';
+// Bump the version whenever the wire format changes, so old and new pages never meet in one room.
+// v2: messages are compressed binary (see codec.ts) instead of plain JSON.
+const PREFIX = 'p2p-holdem-v2-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -89,6 +92,8 @@ export class PokerNet {
   private dialing = false;
   private joined = false; // client: initial join finished, the heartbeat may now redial
   private pendingJoin: { resolve(): void; reject(e: Error): void } | null = null;
+  // Compression is asynchronous, so each connection chains its sends to keep messages in order.
+  private outbox = new WeakMap<DataConnection, Promise<void>>();
   private timer: ReturnType<typeof setInterval>;
   private destroyed = false;
 
@@ -173,10 +178,16 @@ export class PokerNet {
   }
 
   private wire(conn: DataConnection) {
-    conn.on('data', (m) => {
-      if (this.destroyed || !m || typeof (m as Msg).t !== 'string') return;
-      if (this.role === 'host') this.onClientMsg(conn, m as Msg);
-      else this.onHostMsg(conn, m as Msg);
+    let inbox = Promise.resolve(); // decode in arrival order
+    conn.on('data', (data) => {
+      inbox = inbox
+        .then(() => decode(data))
+        .then((m) => {
+          if (this.destroyed || !m || typeof (m as Msg).t !== 'string') return;
+          if (this.role === 'host') this.onClientMsg(conn, m as Msg);
+          else this.onHostMsg(conn, m as Msg);
+        })
+        .catch(() => {}); // not a valid compressed message: ignore it
     });
     const closed = () => this.onClose(conn);
     conn.on('close', closed);
@@ -184,7 +195,14 @@ export class PokerNet {
   }
 
   private send(conn: DataConnection | null, msg: Msg) {
-    if (conn?.open) conn.send(msg);
+    if (!conn?.open) return;
+    const next = (this.outbox.get(conn) ?? Promise.resolve())
+      .then(() => encode(msg))
+      .then((bytes) => {
+        if (conn.open) conn.send(bytes);
+      })
+      .catch(() => {});
+    this.outbox.set(conn, next);
   }
 
   private request(msg: Msg) {
@@ -236,7 +254,7 @@ export class PokerNet {
 
   private dial(): Promise<void> {
     this.dialing = true;
-    const conn = this.peer.connect(PREFIX + this.roomCode, { reliable: true, serialization: 'json' });
+    const conn = this.peer.connect(PREFIX + this.roomCode, { reliable: true, serialization: 'raw' });
     this.wire(conn);
     conn.on('open', () => this.send(conn, { t: 'hello', ...this.me, peerId: this.peer.id }));
     return new Promise<void>((resolve, reject) => {
@@ -311,7 +329,7 @@ export class PokerNet {
     for (const m of this.members.values()) {
       if (m.id === this.me.id) continue;
       m.goneAt = now;
-      const conn = this.peer.connect(m.peerId, { reliable: true, serialization: 'json' });
+      const conn = this.peer.connect(m.peerId, { reliable: true, serialization: 'raw' });
       this.wire(conn);
       conn.on('open', () => this.send(conn, { t: 'promote' }));
     }

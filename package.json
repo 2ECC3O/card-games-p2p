@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx src/engine/pokerEngine.test.ts"
+    "test": "tsx src/engine/pokerEngine.test.ts && tsx src/network/codec.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
