@@ -7,6 +7,8 @@ import { button, field, label } from './components/ui';
 import { BETTING_PHASES, type BlindLevel, type GameState, type PlayerAction, type TableConfig } from './types/poker';
 import { createGame } from './engine/pokerEngine';
 import { useAudio } from './hooks/useAudio';
+import { useWakeLock } from './hooks/useWakeLock';
+import { isInAppBrowser } from './inAppBrowser';
 import { PokerNet, randomRoomCode, type Identity, type NetStatus } from './network/pokerNet';
 
 const randomHex = (bytes: number) =>
@@ -60,6 +62,7 @@ export default function App() {
   const [status, setStatus] = useState<NetStatus>('connecting');
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
   const [muted, setMuted] = useState(() => localStorage.getItem('poker.muted') === '1');
+  const [inAppHint, setInAppHint] = useState(() => isInAppBrowser(navigator.userAgent));
   const { chime } = useAudio();
   const netRef = useRef<PokerNet | null>(null);
   const inviteRef = useRef<HTMLDialogElement>(null);
@@ -168,6 +171,9 @@ export default function App() {
     if (turnKey && !muted) chime();
   }, [turnKey, muted, chime]);
 
+  // Keep the phone screen on while at a table; a locked screen pauses the page and costs turns.
+  useWakeLock(!!net && !!game);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -189,6 +195,18 @@ export default function App() {
                 Texas Hold'em with friends, right in the browser. Virtual chips, no sign-up.
               </p>
             </header>
+
+            {inAppHint && (
+              <div className="rise-in flex items-start gap-3 rounded-xl bg-slate-900/80 px-3.5 py-3 text-sm text-slate-200 ring-1 ring-white/15" role="note">
+                <p className="flex-1">
+                  You're in an app's built-in browser, which can block the connection to other players. Open this page in Safari or
+                  Chrome instead: use the app's menu and choose <span className="font-semibold text-slate-50">Open in browser</span>.
+                </p>
+                <button onClick={() => setInAppHint(false)} className={`${button.quiet} min-h-9 shrink-0 px-3 text-sm`}>
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {notice && (
               <p className="rise-in rounded-xl bg-amber-300/10 px-3.5 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30" role="alert">

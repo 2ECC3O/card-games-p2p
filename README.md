@@ -45,8 +45,9 @@ Everyone opens the same web page. The host shares the **room code**, the **invit
    whatever address you opened.
 3. Friends scan the QR code or open the link. Windows may ask to let Node through the firewall; allow it.
 
-On a plain `http://` address the **Share link** button can't copy to the clipboard (browsers only allow
-that on HTTPS). The QR code and room code still work.
+On a plain `http://` address two phone features are switched off by the browser (see
+[Why HTTPS](#why-https)): the **Share link** button can't share or copy, and the screen won't be kept awake.
+The QR code, room code and the game itself still work.
 
 ### Over the internet
 
@@ -59,6 +60,21 @@ Put the built site on any static host with HTTPS and send people the link:
 The site uses relative paths (`base: './'` in `vite.config.ts`), so it also works from a sub-folder.
 GitHub Pages works too, but this repository is private and Pages on a private repository
 `[UNVERIFIED]` needs a paid GitHub plan.
+
+### Why HTTPS
+
+A page served over HTTPS (or from `localhost`) counts as a "secure context", and browsers only give some
+features to secure pages:
+
+| Feature | Used for | On plain `http://` |
+|---|---|---|
+| Web Share API and clipboard | **Share link** button | Does nothing |
+| Screen Wake Lock API | Keeping the phone screen on during a game | Screen dims and locks as usual |
+
+The game itself (WebRTC connections, cards, chips) doesn't need HTTPS, so it should also work over plain
+`http://` (`[UNVERIFIED]` on real phones; only tested on `localhost`). HTTPS additionally
+encrypts the page download, so nobody on the same network (for example public Wi-Fi) can alter the game
+files on the way. Static hosts such as Netlify and Cloudflare Pages give you HTTPS automatically.
 
 ### Players on mobile data or strict networks
 
@@ -75,6 +91,25 @@ cp .env.example .env
 ```
 
 ---
+
+## Phones and browsers
+
+The app is built for **Safari 16.4+, Chrome 111+ and Firefox 128+** (the minimums of Tailwind CSS 4, which it
+uses). On iPhone and iPad, browsers use Safari's engine (Apple's rule; the EU allows other engines since
+iOS 17.4 `[UNVERIFIED]` but major browsers there still mostly use Safari's), so iOS 16.4 or newer is needed. It has been
+tested in desktop Chrome at phone, tablet and laptop sizes, **not yet on real iPhones or Android phones**.
+
+Things phones do differently:
+
+- **Screen lock and app switching pause the page.** While you're at a table the app asks the browser to keep
+  the screen on (HTTPS only, and the browser may refuse, e.g. in battery saver). If a phone does lock:
+  the room creator's seat is taken over by another player after about 6 seconds, a player whose turn it is
+  gets checked or folded after 30 seconds, and anyone who comes back within 60 seconds keeps their seat.
+- **Sound:** iPhones only allow sound after a tap, so the turn chime is switched on by your first tap on the
+  page (Create, Join, Start...). No vibration on iPhones; Safari doesn't support it.
+- **Links opened inside apps** (Instagram, Facebook, Messenger, LINE, Snapchat, TikTok, WeChat...) open in
+  that app's built-in browser, which can block the connections. The home screen detects these and asks the
+  player to open the page in Safari or Chrome.
 
 ## How to play
 
@@ -162,7 +197,9 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 | `src/components/ActionControls.tsx` | Fold / Check / Call / Raise panel with the raise slider |
 | `src/components/InviteCard.tsx` | Room code, QR code and share button |
 | `src/components/ui.ts` | Shared button and form styles |
-| `src/hooks/useAudio.ts` | The "your turn" chime |
+| `src/hooks/useAudio.ts` | The "your turn" chime, switched on by the first tap (needed on iPhones) |
+| `src/hooks/useWakeLock.ts` | Keeps the screen on while at a table |
+| `src/inAppBrowser.ts` | Detects social apps' built-in browsers for the "open in your browser" notice |
 | `src/index.css` | Fonts, Tailwind setup and the animations (card deals, chips, pots) |
 
 Built with React 18, TypeScript, Vite, Tailwind CSS 4, PeerJS, `pokersolver`, `qrcode.react`,
