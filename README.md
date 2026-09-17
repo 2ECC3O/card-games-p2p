@@ -6,6 +6,8 @@ everyone else connects to it directly (peer to peer).
 
 Works on phones, tablets and desktop browsers.
 
+**Play it here: https://2ecc3o.github.io/holdem-p2p/**
+
 ---
 
 ## Quick start
@@ -58,8 +60,12 @@ Put the built site on any static host with HTTPS and send people the link:
    with build command `npm run build` and output folder `dist`.
 
 The site uses relative paths (`base: './'` in `vite.config.ts`), so it also works from a sub-folder.
-GitHub Pages works too, but this repository is private and Pages on a private repository
-`[UNVERIFIED]` needs a paid GitHub plan.
+
+**This repository already publishes itself to GitHub Pages.** Every push to `main` runs
+`.github/workflows/deploy.yml`: install, `npm test`, `npm run build`, then deploy `dist/` to
+https://2ecc3o.github.io/holdem-p2p/. If the tests or the build fail, nothing is deployed. You can also
+start a deployment by hand from the repository's **Actions** tab (**Deploy to GitHub Pages**, then
+**Run workflow**). In a fork, turn it on under **Settings > Pages > Source: GitHub Actions**.
 
 ### Why HTTPS
 
@@ -201,6 +207,7 @@ the secret won't match. Your display name and mute setting are kept in `localSto
 | `src/hooks/useWakeLock.ts` | Keeps the screen on while at a table |
 | `src/inAppBrowser.ts` | Detects social apps' built-in browsers for the "open in your browser" notice |
 | `src/index.css` | Fonts, Tailwind setup and the animations (card deals, chips, pots) |
+| `.github/workflows/deploy.yml` | Tests, builds and publishes the site to GitHub Pages on every push to `main` |
 
 Built with React 18, TypeScript, Vite, Tailwind CSS 4, PeerJS, `pokersolver`, `qrcode.react`,
 Phosphor icons and the Geist font (bundled with the app, no external font requests).
