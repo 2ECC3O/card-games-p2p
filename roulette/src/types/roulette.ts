@@ -1,0 +1,60 @@
+/**
+ * Where a bet can go: a single number ("n0" to "n36") or an outside bet. d1-d3 are the dozens (1-12, 13-24,
+ * 25-36), c1-c3 the columns (c1 = 1, 4, 7 ... 34).
+ */
+export type Spot = `n${number}` | 'red' | 'black' | 'odd' | 'even' | 'low' | 'high' | 'd1' | 'd2' | 'd3' | 'c1' | 'c2' | 'c3';
+
+/** waiting: nobody seated. betting: everyone places chips. settled: the wheel has spun, results on show. */
+export type Phase = 'waiting' | 'betting' | 'settled';
+
+export interface TableConfig {
+  startingStack: number;
+  minBet: number;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  seat: number;
+  chips: number;
+  /** Chips on each spot this round (already taken from `chips`). */
+  bets: Partial<Record<Spot, number>>;
+  /** The bets of the last round this player played, for Repeat. */
+  lastBets: Partial<Record<Spot, number>>;
+  /** Finished betting this round. */
+  done: boolean;
+  /** Chips paid back at settlement (stakes included). */
+  payout: number;
+  connected: boolean;
+}
+
+export interface QueuedPlayer {
+  id: string;
+  name: string;
+  connected: boolean;
+}
+
+export type PlayerAction =
+  | { type: 'bet'; spot: Spot; amount: number }
+  | { type: 'clear' }
+  | { type: 'repeat' }
+  | { type: 'done' };
+
+export interface GameState {
+  roomCode: string;
+  config: TableConfig;
+  started: boolean;
+  phase: Phase;
+  round: number;
+  /** Seated players, sorted by seat. */
+  players: Player[];
+  queue: QueuedPlayer[];
+  /** The winning number once the wheel has spun this round. */
+  result: number | null;
+  /** Recent winning numbers, newest first. */
+  history: number[];
+  /** End of the betting window. */
+  deadline: number | null;
+  nextRoundAt: number | null;
+  lastActionAt: number;
+}

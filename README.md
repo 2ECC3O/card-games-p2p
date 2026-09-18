@@ -1,6 +1,6 @@
 # Card Games P2P
 
-Poker and blackjack you play with friends in the browser. Free, fake chips, no sign-up.
+Poker, blackjack and roulette you play with friends in the browser. Free, fake chips, no sign-up.
 
 **Play now: https://2ecc3o.github.io/card-games-p2p/**
 
@@ -10,6 +10,7 @@ Poker and blackjack you play with friends in the browser. Free, fake chips, no s
 |---|---|---|---|
 | Texas Hold'em | 2 to 10 | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
 | Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
+| Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
 
 ## Start a game in a minute
 
@@ -27,7 +28,7 @@ Your friends don't need to be on your Wi-Fi. They can join from anywhere, mobile
 | someone joins late | they wait in a queue and get dealt in at the next hand |
 | a player reloads the page or their phone locks | they keep their seat if they come back within 60 seconds |
 | the person who made the room leaves | another player's browser takes over after about 6 seconds and the game goes on |
-| a player takes too long | the game moves on for them: check or fold after 30 s in Hold'em, stand after 20 s in blackjack |
+| a player takes too long | the game moves on for them: check or fold after 30 s in Hold'em, stand after 20 s in blackjack, betting closes after 25 s in roulette |
 | nobody does anything for 5 minutes | the room closes |
 | everyone closes the tab | the room is gone (there's no server keeping it) |
 | you opened the link inside Instagram, TikTok, Messenger... | open it in Safari or Chrome instead; those built-in browsers can block the connection |
@@ -46,7 +47,7 @@ Each player's browser only receives the cards that player is allowed to see. The
 whole deck, though, so play with people you trust.
 
 Each game's own README has the full rules and details:
-[Hold'em](poker/README.md) · [Blackjack](blackjack/README.md)
+[Hold'em](poker/README.md) · [Blackjack](blackjack/README.md) · [Roulette](roulette/README.md)
 
 ## For developers
 
@@ -59,11 +60,12 @@ Each game's own README has the full rules and details:
 |---|---|
 | `poker/` | the Hold'em app (Vite + React + TypeScript) |
 | `blackjack/` | the blackjack app, same stack and design |
+| `roulette/` | the roulette app, same stack and design |
 | `index.html` | the game picker page at the root of the site |
 | `.github/workflows/deploy.yml` | tests, builds and publishes everything |
 
-Each game is its own app with its own `package.json`. The two don't share code; blackjack started as a
-copy of Hold'em's networking and styling.
+Each game is its own app with its own `package.json`. They don't share code; blackjack started as a
+copy of Hold'em's networking and styling, and roulette as a copy of blackjack's.
 
 ### Run a game on your computer
 
@@ -75,14 +77,14 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Use `cd blackjack` for the other game.
+Open http://localhost:5173. Use `cd blackjack` or `cd roulette` for the other games.
 
 `npm test` runs the rule and network checks. `npm run build` makes the finished site in `dist/`.
 
 ### Publishing
 
-Pushing to `main` publishes the site. GitHub Actions runs the tests and build for both games, then puts the
-picker page at the root and each game in its own folder. If either game fails, nothing goes live and the
+Pushing to `main` publishes the site. GitHub Actions runs the tests and build for every game, then puts the
+picker page at the root and each game in its own folder. If any game fails, nothing goes live and the
 current site stays up.
 
 Players on mobile data sometimes can't connect directly. An optional relay fixes that: set the

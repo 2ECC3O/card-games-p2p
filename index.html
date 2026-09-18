@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#020617" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
     <title>Card Games P2P</title>
-    <meta name="description" content="Texas Hold'em and blackjack with friends in the browser. Virtual chips, no sign-up." />
+    <meta name="description" content="Texas Hold'em, blackjack and roulette with friends in the browser. Virtual chips, no sign-up." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Card Games P2P" />
-    <meta property="og:description" content="Texas Hold'em and blackjack with friends in the browser. Virtual chips, no sign-up." />
+    <meta property="og:description" content="Texas Hold'em, blackjack and roulette with friends in the browser. Virtual chips, no sign-up." />
     <meta name="twitter:card" content="summary" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -57,7 +57,7 @@
       }
       @media (min-width: 40rem) {
         .games {
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
           gap: 1.5rem;
         }
       }
@@ -78,6 +78,10 @@
       a.blackjack {
         --accent: #60a5fa;
         --felt: #1e3a8a;
+      }
+      a.roulette {
+        --accent: #f87171;
+        --felt: #7f1d1d;
       }
       a:hover {
         transform: translateY(-2px);
@@ -136,6 +140,12 @@
           <h2>Blackjack</h2>
           <p>Up to 7 players against the house. Blackjack pays 3 to 2.</p>
           <span class="play">Play Blackjack →</span>
+        </a>
+        <a href="roulette/" class="roulette">
+          <span class="suit" aria-hidden="true">◉</span>
+          <h2>Roulette</h2>
+          <p>Up to 10 players around one single-zero wheel. A number pays 35 to 1.</p>
+          <span class="play">Play Roulette →</span>
         </a>
       </div>
     </main>

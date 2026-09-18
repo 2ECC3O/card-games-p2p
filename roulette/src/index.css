@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Wide AND tall screens get the biggest table sizes; short laptop screens keep the mid sizes. */
+@custom-variant tall (@media (min-width: 64rem) and (min-height: 50rem));
+
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+}
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes turn-drain {
+  from {
+    transform: scaleX(1);
+    background-color: #e2e8f0;
+  }
+  70% {
+    background-color: #fbbf24;
+  }
+  to {
+    transform: scaleX(0);
+    background-color: #f43f5e;
+  }
+}
+
+.turn-timer {
+  transform-origin: left;
+  animation-name: turn-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* Showdown: each pot share slides from the middle of the table to its winner's seat.
+   --dx/--dy are the seat offset in percent of the table; the table is a size container. */
+@keyframes pot-to-winner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh)) scale(0.6);
+  }
+}
+
+.pot-to-winner {
+  animation: pot-to-winner 1.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+
+/* A bet: chips leave the seat (--dx/--dy away, in % of the table) and settle on the felt. */
+@keyframes chip-from {
+  from {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh)) scale(0.7);
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.chip-from {
+  transform: translate(-50%, -50%);
+  animation: chip-from 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* End of a betting round: the chips on the felt slide into the pot and disappear into it. */
+@keyframes chip-to {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh)) scale(0.85);
+  }
+}
+
+.chip-to {
+  transform: translate(-50%, -50%);
+  animation: chip-to 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* The pot pill bumps as the collected chips land (after chip-to). */
+@keyframes pot-bump {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.pot-bump {
+  animation: pot-bump 0.3s ease-out 0.45s both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Settlement: a losing bet drifts off toward the dealer. */
+@keyframes chip-lost {
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 1.5rem)) scale(0.8);
+  }
+}
+
+.chip-lost {
+  transform: translate(-50%, -50%);
+  animation: chip-lost 0.5s ease-in both;
+}
+
+/* Reduce Motion: nothing moves, but things still appear in order, so a fade keeps each one's delay. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation-name: fade-in;
+  }
+  .chip-from,
+  .pot-bump {
+    animation: none;
+  }
+  .chip-to,
+  .chip-lost,
+  .pot-to-winner {
+    display: none;
+  }
+}
+
+/* Roulette: a chip lands on the board. */
+@keyframes chip-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(1.3);
+  }
+}
+
+.chip-drop {
+  transform: translate(-50%, -50%);
+  animation: chip-drop 0.2s ease-out both;
+}
+
+/* The winning spots once the wheel stops. */
+@keyframes win-glow {
+  50% {
+    box-shadow: inset 0 0 0 3px #fcd34d, 0 0 16px 2px rgb(252 211 77 / 0.6);
+  }
+}
+
+.win-glow {
+  box-shadow: inset 0 0 0 2px #fcd34d;
+  animation: win-glow 1.2s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-drop,
+  .win-glow {
+    animation: none;
+  }
+}
