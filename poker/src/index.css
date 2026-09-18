@@ -132,8 +132,17 @@ body {
   animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* Reduce Motion: nothing moves, but things still appear in order, so a fade keeps each one's delay. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rise-in,
+  .rise-in {
+    animation-name: fade-in;
+  }
   .chip-from,
   .pot-bump {
     animation: none;

@@ -26,7 +26,7 @@ const DEAL_STEP = 260; // between hole cards, dealt one at a time around the tab
 const BOARD_STEP = 500; // between board cards that arrive together (the flop, an all-in runout)
 const REVEAL_STEP = 450; // between players turning their cards over at showdown
 
-const face = 'absolute inset-0 rounded-md shadow-md shadow-black/30 [backface-visibility:hidden]';
+const face = 'absolute inset-0 rounded-md shadow-md shadow-black/30 transition-opacity duration-500 [backface-visibility:hidden]';
 
 /**
  * A card that can be dealt and turned over. With `dealDelay` it flies in face down from the table's deck
@@ -35,13 +35,21 @@ const face = 'absolute inset-0 rounded-md shadow-md shadow-black/30 [backface-vi
  */
 function CardView({ card, size, className = '', dealDelay, flipDelay = 0 }: { card: Card; size: keyof typeof SIZE; className?: string; dealDelay?: number; flipDelay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [landsAt] = useState(() => (dealDelay === undefined ? 0 : Date.now() + dealDelay + FLY_MS));
-  const [shown, setShown] = useState<Card>(dealDelay === undefined ? card : '??');
+  // Reduce Motion: nothing flies or turns over. A dealt card fades in face up at its turn, and a hidden card
+  // that becomes known cross-fades.
+  const [reduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [landsAt] = useState(() => (dealDelay === undefined ? 0 : Date.now() + dealDelay + (reduced ? 0 : FLY_MS)));
+  const [shown, setShown] = useState<Card>(dealDelay === undefined || reduced ? card : '??');
 
   useLayoutEffect(() => {
     const el = ref.current!;
+    if (dealDelay === undefined) return;
+    if (reduced) {
+      const fade = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, delay: dealDelay, fill: 'backwards' });
+      return () => fade.cancel();
+    }
     const deck = el.closest('[data-table]')?.querySelector('[data-deck]');
-    if (dealDelay === undefined || !deck || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!deck) return;
     const from = deck.getBoundingClientRect();
     const to = el.getBoundingClientRect();
     const dx = from.left + from.width / 2 - (to.left + to.width / 2);
@@ -65,10 +73,10 @@ function CardView({ card, size, className = '', dealDelay, flipDelay = 0 }: { ca
   return (
     <div ref={ref} className={`${SIZE[size]} ${className} relative shrink-0 [perspective:800px]`}>
       <div
-        className="relative size-full transition-transform ease-in-out [transform-style:preserve-3d] motion-reduce:transition-none"
-        style={{ transitionDuration: `${FLIP_MS}ms`, transform: shown === '??' ? 'rotateY(180deg)' : undefined }}
+        className="relative size-full transition-transform ease-in-out [transform-style:preserve-3d]"
+        style={{ transitionDuration: `${FLIP_MS}ms`, transform: shown === '??' && !reduced ? 'rotateY(180deg)' : undefined }}
       >
-        <div className={`${face} flex flex-col items-center justify-center bg-slate-50 leading-none font-semibold ${red ? 'text-rose-600' : 'text-slate-900'}`}>
+        <div style={{ opacity: reduced && shown === '??' ? 0 : 1 }} className={`${face} flex flex-col items-center justify-center bg-slate-50 leading-none font-semibold ${red ? 'text-rose-600' : 'text-slate-900'}`}>
           {shown !== '??' && (
             <>
               <span>{shown[0] === 'T' ? '10' : shown[0]}</span>
@@ -77,7 +85,8 @@ function CardView({ card, size, className = '', dealDelay, flipDelay = 0 }: { ca
           )}
         </div>
         <div
-          className={`${face} border border-emerald-200/15 bg-[repeating-linear-gradient(45deg,#064e3b_0_5px,#065f46_5px_10px)] [transform:rotateY(180deg)]`}
+          style={{ opacity: reduced && shown !== '??' ? 0 : 1 }}
+          className={`${face} border border-emerald-200/15 bg-[repeating-linear-gradient(45deg,#064e3b_0_5px,#065f46_5px_10px)] ${reduced ? '' : '[transform:rotateY(180deg)]'}`}
         />
       </div>
     </div>
