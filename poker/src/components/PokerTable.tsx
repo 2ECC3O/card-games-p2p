@@ -1,6 +1,6 @@
 import { WifiSlashIcon } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { buildPots, TURN_MS } from '../engine/pokerEngine';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { buildPots, MAX_SEATS, TURN_MS } from '../engine/pokerEngine';
 import { BETTING_PHASES, type Card, type GameState, type Player } from '../types/poker';
 
 interface Props {
@@ -18,24 +18,68 @@ const SIZE = {
   large: 'h-16 w-12 text-xl sm:h-20 sm:w-14 sm:text-2xl tall:h-24 tall:w-17 tall:text-3xl',
 };
 
-function CardView({ card, size, className = '', style }: { card: Card; size: keyof typeof SIZE; className?: string; style?: CSSProperties }) {
-  const base = `${SIZE[size]} ${className} rounded-md shadow-md shadow-black/30`;
-  if (card === '??') {
-    return (
-      <div
-        style={style}
-        className={`${base} border border-emerald-200/15 bg-[repeating-linear-gradient(45deg,#064e3b_0_5px,#065f46_5px_10px)]`}
-      />
+// Card motion, in ms. A dealt card flies from the deck face down, lands, waits FLIP_PAUSE, then turns over.
+const FLY_MS = 650;
+const FLIP_MS = 550;
+const FLIP_PAUSE = 350;
+const DEAL_STEP = 260; // between hole cards, dealt one at a time around the table
+const BOARD_STEP = 500; // between board cards that arrive together (the flop, an all-in runout)
+const REVEAL_STEP = 450; // between players turning their cards over at showdown
+
+const face = 'absolute inset-0 rounded-md shadow-md shadow-black/30 [backface-visibility:hidden]';
+
+/**
+ * A card that can be dealt and turned over. With `dealDelay` it flies in face down from the table's deck
+ * (`data-deck`) that many ms after it first appears, then turns face up `flipDelay` ms after landing. A hidden
+ * card ('??') that later becomes known (showdown) turns over `flipDelay` ms after that happens.
+ */
+function CardView({ card, size, className = '', dealDelay, flipDelay = 0 }: { card: Card; size: keyof typeof SIZE; className?: string; dealDelay?: number; flipDelay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [landsAt] = useState(() => (dealDelay === undefined ? 0 : Date.now() + dealDelay + FLY_MS));
+  const [shown, setShown] = useState<Card>(dealDelay === undefined ? card : '??');
+
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    const deck = el.closest('[data-table]')?.querySelector('[data-deck]');
+    if (dealDelay === undefined || !deck || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const from = deck.getBoundingClientRect();
+    const to = el.getBoundingClientRect();
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const fly = el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) rotate(-25deg) scale(0.6)`, opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'none', opacity: 1 }],
+      { duration: FLY_MS, delay: dealDelay, easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)', fill: 'backwards' },
     );
-  }
-  const red = card[1] === 'h' || card[1] === 'd';
+    return () => fly.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (card === shown) return;
+    const t = setTimeout(() => setShown(card), Math.max(0, landsAt - Date.now()) + flipDelay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card]);
+
+  const red = shown[1] === 'h' || shown[1] === 'd';
   return (
-    <div
-      style={style}
-      className={`${base} flex flex-col items-center justify-center bg-slate-50 leading-none font-semibold ${red ? 'text-rose-600' : 'text-slate-900'}`}
-    >
-      <span>{card[0] === 'T' ? '10' : card[0]}</span>
-      <span>{SUIT[card[1] as keyof typeof SUIT]}</span>
+    <div ref={ref} className={`${SIZE[size]} ${className} relative shrink-0 [perspective:800px]`}>
+      <div
+        className="relative size-full transition-transform ease-in-out [transform-style:preserve-3d] motion-reduce:transition-none"
+        style={{ transitionDuration: `${FLIP_MS}ms`, transform: shown === '??' ? 'rotateY(180deg)' : undefined }}
+      >
+        <div className={`${face} flex flex-col items-center justify-center bg-slate-50 leading-none font-semibold ${red ? 'text-rose-600' : 'text-slate-900'}`}>
+          {shown !== '??' && (
+            <>
+              <span>{shown[0] === 'T' ? '10' : shown[0]}</span>
+              <span>{SUIT[shown[1] as keyof typeof SUIT]}</span>
+            </>
+          )}
+        </div>
+        <div
+          className={`${face} border border-emerald-200/15 bg-[repeating-linear-gradient(45deg,#064e3b_0_5px,#065f46_5px_10px)] [transform:rotateY(180deg)]`}
+        />
+      </div>
     </div>
   );
 }
@@ -65,7 +109,10 @@ function SecondsLeft({ deadline }: { deadline: number }) {
   );
 }
 
-function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boolean }) {
+/** `holeDelay(i)`: when hole card i is dealt. At showdown: `revealDelay`, when these cards turn over; `resultDelay`, when the result shows. */
+function Seat({
+  p, state, isHero, holeDelay, revealDelay, resultDelay,
+}: { p: Player; state: GameState; isHero: boolean; holeDelay: (i: number) => number; revealDelay: number; resultDelay: number }) {
   const deadline = state.activeId === p.id && BETTING_PHASES.includes(state.phase) ? state.turnDeadline : null;
   const active = state.activeId === p.id;
   const won = state.phase === 'showdown' && state.pots.some((pot) => pot.winners.includes(p.id));
@@ -77,11 +124,19 @@ function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boole
         // Your own cards fan slightly and overlap, which keeps them clear of the neighbouring seats.
         <div className={`-mb-2 flex ${isHero ? '-space-x-2' : 'gap-0.5'}`}>
           {p.hole.map((c, i) => (
-            <CardView key={i} card={c} size={isHero ? 'large' : 'seat'} className={isHero ? (i === 0 ? '-rotate-4' : 'rotate-4') : ''} />
+            <CardView
+              key={`${state.handNumber}-${i}`}
+              card={c}
+              size={isHero ? 'large' : 'seat'}
+              className={isHero ? (i === 0 ? '-rotate-4' : 'rotate-4') : ''}
+              dealDelay={holeDelay(i)}
+              flipDelay={isHero ? FLIP_PAUSE : revealDelay}
+            />
           ))}
         </div>
       )}
       <div
+        style={won ? { transitionDelay: `${resultDelay}ms` } : undefined} // the winner lights up with the result
         className={`relative min-w-20 max-w-28 rounded-xl px-2.5 py-1 text-center shadow-lg shadow-black/40 transition duration-300 sm:min-w-24 tall:min-w-28 tall:max-w-36 tall:py-1.5 ${
           active
             ? 'bg-slate-900 ring-2 ring-emerald-300 shadow-emerald-400/20'
@@ -170,6 +225,27 @@ export default function PokerTable({ state, heroId, invite }: Props) {
   }, [state]);
 
   const players = state.players;
+  // Dealing goes clockwise from the player left of the button, one card each, twice round.
+  const clockwise = (p: Player) => (p.seat - state.dealerSeat - 1 + MAX_SEATS) % MAX_SEATS;
+  const dealOrder = [...players].sort((a, b) => clockwise(a) - clockwise(b));
+  const holeDelay = (id: string) => (i: number) => (i * players.length + dealOrder.findIndex((p) => p.id === id)) * DEAL_STEP;
+
+  // Showdown, worked out once per hand so re-renders don't restart anything: players turn their cards over one
+  // after another, then any board cards still to come (an all-in runout) are dealt, then the result shows.
+  const showdown = useRef({ hand: -1, reveal: new Map<string, number>(), runoutAt: 0, resultAt: 0 });
+  if (state.phase === 'showdown' && showdown.current.hand !== state.handNumber) {
+    const revealing = dealOrder.filter((p) => p.id !== heroId && p.showCards);
+    const runoutAt = revealing.length ? (revealing.length - 1) * REVEAL_STEP + FLIP_MS + 200 : 0;
+    const runout = Math.max(0, state.board.length - shownCards.current);
+    showdown.current = {
+      hand: state.handNumber,
+      reveal: new Map(revealing.map((p, i) => [p.id, i * REVEAL_STEP])),
+      runoutAt,
+      resultAt: runoutAt + (runout ? (runout - 1) * BOARD_STEP + FLY_MS + FLIP_PAUSE + FLIP_MS : 0),
+    };
+  }
+  const { reveal, runoutAt, resultAt } = state.phase === 'showdown' ? showdown.current : { reveal: new Map<string, number>(), runoutAt: 0, resultAt: 0 };
+
   const heroIndex = Math.max(0, players.findIndex((p) => p.id === heroId));
   const ordered = [...players.slice(heroIndex), ...players.slice(0, heroIndex)]; // hero first, then clockwise
   const queuePos = state.queue.findIndex((q) => q.id === heroId);
@@ -189,8 +265,11 @@ export default function PokerTable({ state, heroId, invite }: Props) {
   const potLabel = (i: number, count: number) => (count === 1 ? 'Pot' : i === 0 ? 'Main' : count > 2 ? `Side ${i}` : 'Side');
 
   return (
-    <div className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
+    <div data-table className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
       <div className="absolute inset-x-[9%] inset-y-[13%] rounded-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_center,#15803d_0%,#14532d_78%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
+
+      {/* Where cards are dealt from. */}
+      <div data-deck aria-hidden className="absolute top-1/2 left-1/2 size-0" />
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {state.phase === 'waiting' ? (
@@ -208,20 +287,23 @@ export default function PokerTable({ state, heroId, invite }: Props) {
           // The board stays centred on its own; pots and results hang below it, so a tall showdown
           // panel never pushes the board up into the side seats.
           <div className="relative flex flex-col items-center">
-            <div className="flex min-h-2 gap-1 [perspective:600px] sm:gap-1.5">
+            <div className="flex min-h-2 gap-1 sm:gap-1.5">
               {state.board.map((c, i) => (
+                // Each new card lands face down, then turns over.
                 <CardView
                   key={`${state.handNumber}-${i}`}
                   card={c}
                   size="large"
-                  className="deal-card"
-                  style={{ animationDelay: `${Math.max(0, i - shownCards.current) * 180}ms` }}
+                  dealDelay={runoutAt + Math.max(0, i - shownCards.current) * BOARD_STEP}
+                  flipDelay={FLIP_PAUSE}
                 />
               ))}
             </div>
             {state.phase === 'showdown' ? (
               // At most half the table wide, so it stays clear of the side seats. Several pots get one line each.
-              <div className="rise-in absolute top-full mt-2 w-max max-w-[50cqw] rounded-xl bg-slate-950/75 px-3 py-2 text-center backdrop-blur-sm tall:mt-3 tall:px-5 tall:py-3">
+              <div
+                style={{ animationDelay: `${resultAt}ms` }}
+                className="rise-in absolute top-full mt-2 w-max max-w-[50cqw] rounded-xl bg-slate-950/75 px-3 py-2 text-center backdrop-blur-sm tall:mt-3 tall:px-5 tall:py-3">
                 {state.pots.length === 1 ? (
                   <>
                     <p className="text-sm font-semibold text-slate-50 sm:text-base tall:text-lg">
@@ -279,7 +361,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
               // The bottom seat hangs from the table's bottom edge, so it never covers the action bar or footer text.
               style={i === 0 ? { left: '50%', top: '100%' } : at(point, 1)}
             >
-              <Seat p={p} state={state} isHero={p.id === heroId} />
+              <Seat p={p} state={state} isHero={p.id === heroId} holeDelay={holeDelay(p.id)} revealDelay={reveal.get(p.id) ?? 0} resultDelay={resultAt} />
             </div>
             {p.bet > 0 && (
               // Re-keyed on every change, so each blind, call or raise tosses chips out from the seat again.
@@ -322,7 +404,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
                 key={`${state.handNumber}-${i}-${w}`}
                 aria-hidden
                 className="pot-to-winner pointer-events-none absolute top-1/2 left-1/2"
-                style={travel(x, y, 900 + i * 450)}
+                style={travel(x, y, resultAt + 700 + i * 450)}
               >
                 <Chips amount={share + (k < odd ? 1 : 0)} />
               </div>

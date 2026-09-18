@@ -75,11 +75,11 @@ export function PlayControls({ state, heroId, onAction }: Props) {
           Double <span className="font-mono text-sm text-slate-300">+{bet}</span>
         </button>
       )}
-      {legal.canSplit && (
-        <button disabled={sent} onClick={() => send({ type: 'split' })} className={`${button.quiet} ${big}`}>
-          Split
-        </button>
-      )}
+      {/* Always shown, so players know splitting exists; greyed out with the reason until they can. */}
+      <button disabled={sent || !legal.canSplit} onClick={() => send({ type: 'split' })} className={`${button.quiet} ${big} flex-col gap-0 leading-tight`}>
+        Split
+        {legal.splitBlock && <span className="text-[11px] font-normal text-slate-300 sm:text-xs">{legal.splitBlock}</span>}
+      </button>
       <button disabled={sent} onClick={() => send({ type: 'stand' })} className={`${button.secondary} ${big}`}>
         Stand
       </button>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  addPlayer, applyAction, BET_MS, createGame, handValue, hostTick, maskFor, rejoinQueue, removePlayer, startRound, TURN_MS,
+  addPlayer, applyAction, BET_MS, createGame, handValue, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startRound, TURN_MS,
 } from './blackjackEngine';
 import type { Card, GameState, PlayerAction } from '../types/blackjack';
 
@@ -120,6 +120,18 @@ s = table(1, stack('8s', 'Tc', '9d', '7h'));
 s = bet(s, 'p0', 1000);
 assert.throws(() => act(s, 'p0', { type: 'split' }), /cannot split/);
 assert.throws(() => act(s, 'p0', { type: 'double' }), /cannot double/);
+assert.equal(legalActions(s, 'p0').splitBlock, 'Pairs only');
+
+// The Split button explains itself: a pair without the chips, and the four-hand limit.
+s = table(1, stack('8s', 'Tc', '8d', '7h'));
+s = bet(s, 'p0', 1000);
+assert.equal(legalActions(s, 'p0').splitBlock, 'Not enough chips');
+s = table(1, stack('8s', 'Tc', '8d', '7h', '8c', '8h', '8s', '2d'));
+s = bet(s, 'p0', 10);
+assert.equal(legalActions(s, 'p0').splitBlock, null);
+s = act(act(act(s, 'p0', { type: 'split' }), 'p0', { type: 'split' }), 'p0', { type: 'split' });
+assert.equal(hands(s, 'p0').length, 4);
+assert.equal(legalActions(s, 'p0').splitBlock, '4 hands max');
 
 // Timeouts: betting closes without the slow player; a slow turn stands.
 s = table(2, stack('Ts', '9c', '8h', '8d'));

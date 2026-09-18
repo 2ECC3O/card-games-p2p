@@ -6,6 +6,9 @@ export const MAX_HANDS = 4; // split up to three times
 export const BET_MS = 15_000;
 export const TURN_MS = 20_000;
 export const SETTLE_MS = 6_000;
+/** Extra results time while the table turns the hole card over and deals the dealer's draws (per card). */
+const REVEAL_MS = 1_000;
+const DRAW_MS = 900;
 export const IDLE_MS = 5 * 60_000;
 /** Reshuffle once less than this share of the shoe is left. */
 const CUT = 0.25;
@@ -230,6 +233,7 @@ function settle(s: GameState, now: number) {
   if (!dealerBJ && hands.some((h) => handValue(h.cards).total <= 21 && !natural(h))) {
     while (handValue(s.dealer).total < 17) s.dealer.push(draw(s));
   }
+  s.nextRoundAt! += REVEAL_MS + (s.dealer.length - 2) * DRAW_MS; // time to show it all before the results
   const dealerTotal = handValue(s.dealer).total;
   for (const p of s.players) {
     for (const h of p.hands) {
@@ -251,11 +255,18 @@ function settle(s: GameState, now: number) {
 export function legalActions(s: GameState, id: string) {
   const p = find(s, id);
   const h = p?.hands[s.activeHand];
-  const pair = !!h && h.cards.length === 2;
-  return {
-    canDouble: !!p && !!h && pair && p.chips >= h.bet,
-    canSplit: !!p && !!h && pair && p.chips >= h.bet && p.hands.length < MAX_HANDS && rankValue(h.cards[0]) === rankValue(h.cards[1]),
-  };
+  const twoCards = !!h && h.cards.length === 2;
+  const affordable = !!p && !!h && p.chips >= h.bet;
+  // Why splitting isn't allowed right now, in a few words; null when it is.
+  const splitBlock =
+    !twoCards || rankValue(h.cards[0]) !== rankValue(h.cards[1])
+      ? 'Pairs only'
+      : p!.hands.length >= MAX_HANDS
+        ? `${MAX_HANDS} hands max`
+        : !affordable
+          ? 'Not enough chips'
+          : null;
+  return { canDouble: twoCards && affordable, canSplit: splitBlock === null, splitBlock };
 }
 
 function act(s: GameState, id: string, action: PlayerAction, now: number) {

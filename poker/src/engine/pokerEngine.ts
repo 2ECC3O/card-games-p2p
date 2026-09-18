@@ -14,6 +14,9 @@ export const MAX_SEATS = 10;
 export const MAX_QUEUE = 20;
 export const TURN_MS = 30_000;
 export const SHOWDOWN_MS = 6_000;
+/** Extra showdown time while the table turns cards over (per player) and deals an all-in runout (per card). */
+const REVEAL_MS = 500;
+const RUNOUT_MS = 550;
 export const IDLE_MS = 5 * 60_000;
 
 // ------------------------------------------------ cards
@@ -273,6 +276,7 @@ function finishHand(s: GameState, now: number) {
     return;
   }
 
+  s.nextHandAt += live.length * REVEAL_MS + (5 - s.board.length) * RUNOUT_MS; // time to show it all before the result
   while (s.board.length < 5) s.board.push(s.deck.pop()!);
   const solved = new Map(live.map((p) => [p.id, Hand.solve([...p.hole, ...s.board])]));
   for (const p of live) p.showCards = true;
