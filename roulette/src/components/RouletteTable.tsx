@@ -27,15 +27,58 @@ function useMedia(query: string) {
 
 const colorOf = (n: number) => (n === 0 ? 'Green' : RED.has(n) ? 'Red' : 'Black');
 const TONE = { Green: 'bg-emerald-700', Red: 'bg-red-600', Black: 'bg-slate-950' };
+/** One colour per seat, so everyone can see whose chips are where. Light enough to read on red, black and green. */
+export const PLAYER_COLORS = ['#38bdf8', '#a3e635', '#e879f9', '#fb923c', '#a78bfa', '#fde047', '#34d399', '#f9a8d4', '#f8fafc', '#94a3b8'];
+export const playerColor = (seat: number) => PLAYER_COLORS[seat % PLAYER_COLORS.length];
 const short = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : `${n}`);
 
 // ------------------------------------------------ wheel
 
 const STEP = 360 / 37;
 const polar = (r: number, deg: number) => `${(r * Math.sin((deg * Math.PI) / 180)).toFixed(2)} ${(-r * Math.cos((deg * Math.PI) / 180)).toFixed(2)}`;
-/** One pocket, centred on the top of the wheel; each is rotated into place. */
-const POCKET = `M${polar(97, -STEP / 2)} A97 97 0 0 1 ${polar(97, STEP / 2)} L${polar(62, STEP / 2)} A62 62 0 0 0 ${polar(62, -STEP / 2)}Z`;
+/** One pocket, centred on the top of the wheel; each is rotated into place. The ball track is the rim outside them. */
+const POCKET = `M${polar(86, -STEP / 2)} A86 86 0 0 1 ${polar(86, STEP / 2)} L${polar(58, STEP / 2)} A58 58 0 0 0 ${polar(58, -STEP / 2)}Z`;
 const FILL = { Green: '#047857', Red: '#dc2626', Black: '#0f172a' };
+const TRACK_R = 92; // where the ball runs
+const POCKET_R = 65; // where it comes to rest
+const LAPS = 7;
+
+/**
+ * The ball during a spin: runs round the track the other way from the wheel, slows, drops off the track and
+ * bounces into the pocket at the top, where the winning number stops. Mounted for the spin only.
+ */
+function SpinningBall() {
+  const orbit = useRef<SVGGElement>(null);
+  const ball = useRef<SVGCircleElement>(null);
+  useEffect(() => {
+    const duration = SPIN_MS - 400; // the same as the wheel
+    const run = orbit.current!.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${-360 * LAPS}deg)` }], {
+      duration, easing: 'cubic-bezier(0.1, 0.55, 0.2, 1)', fill: 'forwards',
+    });
+    const drop = TRACK_R - POCKET_R;
+    const fall = ball.current!.animate(
+      [
+        { transform: 'translateY(0)' },
+        { transform: 'translateY(0)', offset: 0.62 },
+        { transform: `translateY(${drop * 0.75}px)`, offset: 0.74, easing: 'ease-out' },
+        { transform: `translateY(${drop * 0.45}px)`, offset: 0.8, easing: 'ease-in' },
+        { transform: `translateY(${drop}px)`, offset: 0.88, easing: 'ease-out' },
+        { transform: `translateY(${drop * 0.85}px)`, offset: 0.93, easing: 'ease-in' },
+        { transform: `translateY(${drop}px)` },
+      ],
+      { duration, fill: 'forwards' },
+    );
+    return () => {
+      run.cancel();
+      fall.cancel();
+    };
+  }, []);
+  return (
+    <g ref={orbit} aria-hidden>
+      <circle ref={ball} cy={-TRACK_R} r="4.5" fill="#f8fafc" stroke="#0f172a" strokeOpacity="0.4" />
+    </g>
+  );
+}
 
 /** Spins (a few turns, then eases out) to put `result` under the marker at the top whenever `spinKey` changes. */
 function Wheel({ result, spinKey, landed, className }: { result: number | null; spinKey: string; landed: boolean; className: string }) {
@@ -54,22 +97,26 @@ function Wheel({ result, spinKey, landed, className }: { result: number | null; 
   return (
     <svg viewBox="-100 -100 200 200" className={`shrink-0 drop-shadow-[0_8px_16px_rgba(0,0,0,.6)] ${className}`} role="img" aria-label={landed && result !== null ? `The wheel stopped on ${result}` : 'Roulette wheel'}>
       <circle r="99.5" fill="#451a03" />
+      {/* The ball track: a darker groove between the wooden rim and the pockets. */}
+      <circle r="92.5" fill="none" stroke="#1c0f05" strokeWidth="11" />
+      <circle r="86.5" fill="none" stroke="#d6b86a" strokeOpacity="0.5" strokeWidth="1" />
       <g style={{ transform: `rotate(${angle}deg)`, transition: reduced ? 'none' : `transform ${SPIN_MS - 400}ms cubic-bezier(0.12, 0.6, 0.08, 1)` }}>
         {WHEEL.map((n, i) => (
           <g key={n} transform={`rotate(${i * STEP})`}>
             <path d={POCKET} fill={FILL[colorOf(n)]} stroke="#d6d3d1" strokeOpacity="0.35" strokeWidth="0.6" />
-            <text y="-86" fill="#f8fafc" fontSize="8.5" fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+            <text y="-77" fill="#f8fafc" fontSize="7.5" fontWeight="600" textAnchor="middle" dominantBaseline="middle">
               {n}
             </text>
           </g>
         ))}
-        <circle r="62" fill="#292524" />
-        <circle r="46" fill="#7f1d1d" stroke="#44403c" strokeWidth="3" />
-        <path d="M0 -30V30M-30 0H30" stroke="#d6b86a" strokeWidth="5" strokeLinecap="round" />
-        <circle r="9" fill="#d6b86a" />
+        <circle r="58" fill="#292524" />
+        <circle r="44" fill="#7f1d1d" stroke="#44403c" strokeWidth="3" />
+        <path d="M0 -28V28M-28 0H28" stroke="#d6b86a" strokeWidth="5" strokeLinecap="round" />
+        <circle r="8" fill="#d6b86a" />
       </g>
-      {landed && <circle cy="-71" r="5" fill="#f8fafc" stroke="#0f172a" strokeOpacity="0.4" className="rise-in" />}
-      <path d="M0 -84L-6 -100H6Z" fill="#fbbf24" stroke="#451a03" strokeWidth="1.5" />
+      {result !== null && !landed && !reduced && <SpinningBall key={spinKey} />}
+      {landed && <circle cy={-POCKET_R} r="4.5" fill="#f8fafc" stroke="#0f172a" strokeOpacity="0.4" />}
+      <path d="M0 -88L-5 -100H5Z" fill="#fbbf24" stroke="#451a03" strokeWidth="1.5" />
     </svg>
   );
 }
@@ -139,15 +186,17 @@ function Board({ state, heroId, canBet, onPlace, landed, upright }: { state: Gam
     >
       {(upright ? UPRIGHT : LYING).map(({ spot, label, name, tone, style }) => {
         const mine = hero?.bets[spot] ?? 0;
-        const others = state.players.some((p) => p.id !== heroId && p.bets[spot]);
+        const others = state.players.filter((p) => p.id !== heroId && p.bets[spot]);
         const won = result !== null && payoutMultiple(spot, result) > 0;
+        const who = others.map((p) => `${p.name} ${p.bets[spot]}`).join(', ');
         return (
           <button
             key={spot}
             style={style}
             disabled={!canBet}
             onClick={() => onPlace(spot)}
-            aria-label={`${name}${mine ? `, your bet ${mine}` : ''}${others ? ', other players have bets here' : ''}`}
+            title={who || undefined}
+            aria-label={`${name}${mine ? `, your bet ${mine}` : ''}${who ? `, bets from ${who}` : ''}`}
             className={`relative grid place-items-center text-xs font-semibold text-slate-50 ring-1 ring-white/25 transition select-none sm:text-sm tall:text-base ${tone} ${
               won ? 'win-glow z-10' : ''
             } enabled:cursor-pointer enabled:hover:brightness-125 enabled:active:brightness-150 focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-200`}
@@ -156,7 +205,8 @@ function Board({ state, heroId, canBet, onPlace, landed, upright }: { state: Gam
             {mine > 0 && (
               <span
                 key={`${state.round}-${mine}`}
-                className={`chip-drop absolute top-1/2 left-1/2 grid h-5 min-w-5 place-items-center rounded-full border-2 border-dashed border-amber-100 bg-amber-400 px-0.5 font-mono text-[9px] leading-none text-amber-950 shadow shadow-black/50 transition-opacity sm:h-6 sm:min-w-6 sm:text-[10px] ${
+                style={{ backgroundColor: playerColor(hero!.seat) }}
+                className={`chip-drop absolute top-1/2 left-1/2 grid h-5 min-w-5 place-items-center rounded-full border-2 border-dashed border-white/80 px-0.5 font-mono text-[9px] leading-none text-slate-950 shadow shadow-black/60 transition-opacity sm:h-6 sm:min-w-6 sm:text-[10px] ${
                   result !== null && !won ? 'opacity-35' : ''
                 }`}
                 aria-hidden
@@ -164,7 +214,15 @@ function Board({ state, heroId, canBet, onPlace, landed, upright }: { state: Gam
                 {short(mine)}
               </span>
             )}
-            {others && !mine && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-slate-100/80" aria-hidden />}
+            {/* Everyone else's chips: a dot in their colour, up to four, then a count. */}
+            {others.length > 0 && (
+              <span className={`absolute top-0.5 right-0.5 flex items-center -space-x-1 transition-opacity ${result !== null && !won ? 'opacity-35' : ''}`} aria-hidden>
+                {others.slice(0, 4).map((p) => (
+                  <span key={p.id} className="size-2.5 rounded-full ring-1 ring-slate-950/80 sm:size-3" style={{ backgroundColor: playerColor(p.seat) }} />
+                ))}
+                {others.length > 4 && <span className="pl-1.5 text-[9px] leading-none text-slate-50">+{others.length - 4}</span>}
+              </span>
+            )}
           </button>
         );
       })}
@@ -249,6 +307,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
               won ? 'bg-red-950 ring-2 ring-red-400' : p.id === heroId ? 'bg-slate-900 ring-1 ring-red-300/60' : 'bg-slate-950/80 ring-1 ring-white/10'
             }`}
           >
+            <span className="size-3 shrink-0 rounded-full ring-1 ring-slate-950/80" style={{ backgroundColor: playerColor(p.seat) }} aria-hidden />
             {!p.connected && <WifiSlashIcon size={12} weight="bold" className="shrink-0 text-rose-300" aria-label="Disconnected" />}
             <span className="max-w-24 truncate font-medium text-slate-200">{p.id === heroId ? 'You' : p.name}</span>
             {/* The payout is already in the chips; hold it back until the wheel stops. */}
