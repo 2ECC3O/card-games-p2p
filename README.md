@@ -1,16 +1,73 @@
 # Card Games P2P
 
-Card games to play with friends in the browser. Free, virtual chips only: no accounts, no money, no game
-server. One player's browser tab hosts the table and everyone else connects to it directly (peer to peer).
+Poker and blackjack you play with friends in the browser. Free, fake chips, no sign-up.
 
-**Play: https://2ecc3o.github.io/card-games-p2p/**
+**Play now: https://2ecc3o.github.io/card-games-p2p/**
 
-| Game | Play | Code |
-|---|---|---|
-| Texas Hold'em, up to 10 players | https://2ecc3o.github.io/card-games-p2p/poker/ | [`poker/`](poker/README.md) |
-| Blackjack, up to 7 players against the house | https://2ecc3o.github.io/card-games-p2p/blackjack/ | [`blackjack/`](blackjack/README.md) |
+## The games
 
-Each game is its own Vite + React app with its own `package.json`. To work on one:
+| Game | Players | You play against | Link |
+|---|---|---|---|
+| Texas Hold'em | 2 to 10 | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
+| Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
+
+## Start a game in a minute
+
+1. Open the link and pick a game.
+2. Type your name and press **Create room**.
+3. Send your friends the room code or the link, or let them scan the QR code.
+4. When everyone is in, press **Start**.
+
+Your friends don't need to be on your Wi-Fi. They can join from anywhere, mobile data included.
+
+## What if...
+
+| If... | Then |
+|---|---|
+| someone joins late | they wait in a queue and get dealt in at the next hand |
+| a player reloads the page or their phone locks | they keep their seat if they come back within 60 seconds |
+| the person who made the room leaves | another player's browser takes over after about 6 seconds and the game goes on |
+| a player takes too long | the game moves on for them: check or fold after 30 s in Hold'em, stand after 20 s in blackjack |
+| nobody does anything for 5 minutes | the room closes |
+| everyone closes the tab | the room is gone (there's no server keeping it) |
+| you opened the link inside Instagram, TikTok, Messenger... | open it in Safari or Chrome instead; those built-in browsers can block the connection |
+
+You need a recent browser: Safari 16.4+, Chrome 111+ or Firefox 128+. On iPhone that means iOS 16.4 or newer.
+
+The chips are pretend. Nobody can buy them or cash them out.
+
+## How it works
+
+The person who creates a room is the host. Their browser deals the cards and checks every move. The other
+players connect straight to the host's browser ([WebRTC](https://webrtc.org), with [PeerJS](https://peerjs.com)
+helping them find each other). There's no game server.
+
+Each player's browser only receives the cards that player is allowed to see. The host's browser holds the
+whole deck, though, so play with people you trust.
+
+Each game's own README has the full rules and details:
+[Hold'em](poker/README.md) · [Blackjack](blackjack/README.md)
+
+## For developers
+
+<details>
+<summary>Folders, running it locally, publishing, adding a game</summary>
+
+### Folders
+
+| Path | What's in it |
+|---|---|
+| `poker/` | the Hold'em app (Vite + React + TypeScript) |
+| `blackjack/` | the blackjack app, same stack and design |
+| `index.html` | the game picker page at the root of the site |
+| `.github/workflows/deploy.yml` | tests, builds and publishes everything |
+
+Each game is its own app with its own `package.json`. The two don't share code; blackjack started as a
+copy of Hold'em's networking and styling.
+
+### Run a game on your computer
+
+Needs [Node.js](https://nodejs.org) 20.19 or newer.
 
 ```bash
 cd poker
@@ -18,15 +75,28 @@ npm install
 npm run dev
 ```
 
-(or `cd blackjack`). Each folder's README covers its rules, tests and hosting.
+Open http://localhost:5173. Use `cd blackjack` for the other game.
 
-## Publishing
+`npm test` runs the rule and network checks. `npm run build` makes the finished site in `dist/`.
 
-Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): for each game
-`npm ci`, `npm test` and `npm run build`, then one GitHub Pages site with the game picker
-([`index.html`](index.html)) at the root and each game in its own folder. If any game's tests or build fail,
-nothing is deployed. The optional TURN relay settings (`OPENRELAY_APP` variable, `OPENRELAY_API_KEY`
-secret) apply to both games.
+### Publishing
+
+Pushing to `main` publishes the site. GitHub Actions runs the tests and build for both games, then puts the
+picker page at the root and each game in its own folder. If either game fails, nothing goes live and the
+current site stays up.
+
+Players on mobile data sometimes can't connect directly. An optional relay fixes that: set the
+`OPENRELAY_APP` variable and `OPENRELAY_API_KEY` secret in the repo settings. The
+[Hold'em README](poker/README.md) explains how.
+
+### Adding a game
+
+1. Make a folder with its own Vite app. Keep `base: './'` in its Vite config, and give it `test` and
+   `build` scripts.
+2. Add the folder name to the `game:` list in `deploy.yml`.
+3. Add a card for it in `index.html`.
+
+</details>
 
 ## License
 
