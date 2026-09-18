@@ -49,6 +49,8 @@ export interface GameState {
   /** Seated players, sorted by seat. */
   players: Player[];
   queue: QueuedPlayer[];
+  /** Watching, not playing. They see every card. */
+  spectators: QueuedPlayer[];
   /** The winning number once the wheel has spun this round. */
   result: number | null;
   /** Recent winning numbers, newest first. */

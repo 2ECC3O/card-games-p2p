@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import pokersolver from 'pokersolver';
 import type { Card, GameState } from '../types/poker';
 import {
-  addPlayer, applyAction, buildPots, cleanName, createGame, hostTick, legalActions, maskFor, MAX_QUEUE, MAX_SEATS,
+  addPlayer, addSpectator, applyAction, buildPots, cleanName, createGame, hostTick, legalActions, maskFor, MAX_QUEUE, MAX_SEATS,
   rejoinQueue, removePlayer, startGame, startHand, TURN_MS,
 } from './pokerEngine';
 
@@ -239,6 +239,22 @@ const id = (s: GameState) => s.activeId!;
   while (s.phase !== 'showdown') s = applyAction(s, id(s), { type: 'check' }, 1);
   assert.deepEqual(s.pots.map((p) => [p.amount, p.winners]), [[165, ['p1', 'p2']]]);
   assert.deepEqual(s.players.map((p) => p.chips), [945, 1028, 1027], 'odd chip to p1, first left of the button');
+}
+
+// ------------------------------------------------ spectators
+{
+  let s = addSpectator(lobby(2), 'w', 'Watcher', 0);
+  assert.equal(s.players.length, 2, 'watching takes no seat');
+  assert.deepEqual(s.spectators.map((w) => w.id), ['w']);
+  s = startGame(s, 0);
+  assert.ok(maskFor(s, 'w').players.every((p) => p.hole.every((c) => c !== '??')), 'spectators see every hole card');
+  assert.deepEqual(maskFor(s, 'w').deck, [], 'but never the deck');
+  assert.ok(maskFor(s, 'p0').players[1].hole.every((c) => c === '??'), 'players still do not');
+  assert.throws(() => applyAction(s, 'w', { type: 'fold' }, 1));
+  assert.equal(rejoinQueue(s, 'w', 'Watcher', 1), s, 'spectators do not queue for a seat');
+  assert.equal(addSpectator(s, 'p0', 'P0', 1).spectators.length, 1, 'a player who comes back to watch stays a player');
+  s = removePlayer(s, 'w', 1);
+  assert.equal(s.spectators.length, 0);
 }
 
 console.log('pokerEngine: all checks passed');

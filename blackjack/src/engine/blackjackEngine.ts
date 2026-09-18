@@ -93,7 +93,7 @@ export function cleanName(name: unknown): string {
 
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
   return {
-    roomCode, config, started: false, phase: 'waiting', round: 0, players: [], queue: [], dealer: [], shoe: [],
+    roomCode, config, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], dealer: [], shoe: [],
     activeId: null, activeHand: 0, deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
@@ -105,6 +105,7 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
     return state; // table and queue full
   return update(state, (s) => {
     s.lastActionAt = now;
+    s.spectators = s.spectators.filter((w) => w.id !== id); // a spectator taking a seat
     const known = find(s, id) ?? s.queue.find((q) => q.id === id);
     if (known) {
       known.name = name;
@@ -119,7 +120,7 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
 
 export function setConnected(state: GameState, id: string, connected: boolean): GameState {
   return update(state, (s) => {
-    const p = find(s, id) ?? s.queue.find((q) => q.id === id);
+    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
     if (p) p.connected = connected;
   });
 }
@@ -130,7 +131,7 @@ export const isBroke = (s: GameState, p: Player) => p.chips < s.config.minBet &&
 /** Broke players ask to be dealt back in with a fresh stack. */
 export function rejoinQueue(state: GameState, id: string, name: string, now: number): GameState {
   const p = find(state, id);
-  if (!state.started || state.queue.length >= MAX_QUEUE || state.queue.some((q) => q.id === id)) return state;
+  if (!state.started || isSpectator(state, id) || state.queue.length >= MAX_QUEUE || state.queue.some((q) => q.id === id)) return state;
   if (p && !isBroke(state, p)) return state;
   return update(state, (s) => {
     s.lastActionAt = now;
@@ -141,6 +142,7 @@ export function rejoinQueue(state: GameState, id: string, name: string, now: num
 export function removePlayer(state: GameState, id: string, now: number): GameState {
   return update(state, (s) => {
     s.queue = s.queue.filter((q) => q.id !== id);
+    s.spectators = s.spectators.filter((w) => w.id !== id);
     const p = find(s, id);
     if (!p) return;
     if (s.phase !== 'playing') {
@@ -152,6 +154,21 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
     p.left = true;
     for (const h of p.hands) h.done = true;
     if (s.activeId === id) nextTurn(s, now);
+  });
+}
+
+/** Watching the table, not playing. */
+export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
+
+/** Join to watch. A seated or queued player who comes back this way stays a player. */
+export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
+  const name = cleanName(rawName);
+  return update(state, (s) => {
+    s.lastActionAt = now;
+    const known = s.spectators.find((w) => w.id === id);
+    if (known) Object.assign(known, { name, connected: true });
+    else s.spectators.push({ id, name, connected: true });
   });
 }
 
@@ -349,10 +366,10 @@ export function hostTick(state: GameState, now: number): GameState {
   return state;
 }
 
-/** What one viewer may see: no shoe, and the dealer's hole card stays down until the dealer plays. */
-export function maskFor(state: GameState, _viewerId: string): GameState {
+/** What one viewer may see: no shoe, and the dealer's hole card stays down until the dealer plays (spectators see it). */
+export function maskFor(state: GameState, viewerId: string): GameState {
   return update(state, (s) => {
     s.shoe = [];
-    if (s.phase === 'playing' && s.dealer.length > 1) s.dealer[1] = '??';
+    if (s.phase === 'playing' && s.dealer.length > 1 && !isSpectator(s, viewerId)) s.dealer[1] = '??';
   });
 }

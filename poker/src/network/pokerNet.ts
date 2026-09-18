@@ -1,6 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
 import {
-  addPlayer, applyAction, cleanName, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
+  addPlayer, addSpectator, applyAction, cleanName, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
 } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
 import { decode, encode } from './codec';
@@ -10,7 +10,8 @@ import { sha256 } from './sha256';
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
 // v2: messages are compressed binary (see codec.ts) instead of plain JSON.
 // v3: secret fingerprints in snapshots, 'closed' message, host can remove players.
-const PREFIX = 'p2p-holdem-v3-';
+// v4: spectators (hello carries 'watch').
+const PREFIX = 'p2p-holdem-v4-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -20,6 +21,8 @@ export interface Identity {
   id: string;
   secret: string;
   name: string;
+  /** Watch without playing. */
+  watch?: boolean;
 }
 export type NetStatus = 'hosting' | 'connected' | 'connecting' | 'reconnecting';
 export interface NetEvents {
@@ -409,7 +412,7 @@ export class PokerNet {
     this.members = new Map(members.map((m) => [m.id, { ...m, conn: null, lastSeen: now, goneAt: null }]));
     const self = { id: this.me.id, name: this.me.name, peerId: this.peer.id, secretHash: sha256(this.me.secret) };
     this.members.set(this.me.id, { ...self, conn: null, lastSeen: now, goneAt: null });
-    this.state = addPlayer(state, this.me.id, this.me.name, now);
+    this.state = (this.me.watch ? addSpectator : addPlayer)(state, this.me.id, this.me.name, now);
     this.status('hosting');
     this.broadcast();
   }
@@ -458,7 +461,7 @@ export class PokerNet {
       }
       if (m.conn && m.conn !== conn) m.conn.close();
       Object.assign(m, { conn, name, peerId: msg.peerId, lastSeen: now, goneAt: null });
-      this.state = addPlayer(this.state!, m.id, name, now);
+      this.state = (msg.watch === true ? addSpectator : addPlayer)(this.state!, m.id, name, now);
       return this.broadcast();
     }
     const m = [...this.members.values()].find((x) => x.conn === conn);

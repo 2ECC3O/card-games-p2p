@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  addPlayer, applyAction, BET_MS, createGame, handValue, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startRound, TURN_MS,
+  addPlayer, addSpectator, applyAction, BET_MS, createGame, handValue, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startRound, TURN_MS,
 } from './blackjackEngine';
 import type { Card, GameState, PlayerAction } from '../types/blackjack';
 
@@ -174,5 +174,20 @@ assert.equal(s.queue.length, 1);
 s = hostTick(s, s.nextRoundAt!);
 assert.equal(chips(s, 'p0'), 1000);
 assert.equal(s.phase, 'betting');
+
+// ------------------------------------------------ spectators
+{
+  let s = table(1, stack('Ts', '5c', '8s', 'Kd'));
+  s = addSpectator(s, 'w', 'Watcher', 0);
+  assert.equal(s.players.length, 1, 'watching takes no seat');
+  s = bet(s, 'p0');
+  assert.equal(s.phase, 'playing');
+  assert.deepEqual(maskFor(s, 'w').dealer, ['5c', 'Kd'], 'spectators see the hole card');
+  assert.deepEqual(maskFor(s, 'w').shoe, [], 'but never the shoe');
+  assert.deepEqual(maskFor(s, 'p0').dealer, ['5c', '??'], 'players still do not');
+  assert.throws(() => act(s, 'w', { type: 'hit' }), /not seated/);
+  s = removePlayer(s, 'w', 1);
+  assert.equal(s.spectators.length, 0);
+}
 
 console.log('engine: all checks passed');

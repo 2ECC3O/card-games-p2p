@@ -93,7 +93,7 @@ export function cleanName(name: unknown): string {
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
   return {
     roomCode, config, started: false, phase: 'waiting', handNumber: 0, blinds: config.blindLevels[0],
-    dealerSeat: -1, players: [], queue: [], board: [], deck: [], pots: [], currentBet: 0, minRaise: 0,
+    dealerSeat: -1, players: [], queue: [], spectators: [], board: [], deck: [], pots: [], currentBet: 0, minRaise: 0,
     activeId: null, turnDeadline: null, nextHandAt: null, lastActionAt: now,
   };
 }
@@ -105,6 +105,7 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
     return state; // table and queue full
   return update(state, (s) => {
     s.lastActionAt = now;
+    s.spectators = s.spectators.filter((w) => w.id !== id); // a spectator taking a seat
     const known = find(s, id) ?? s.queue.find((q) => q.id === id);
     if (known) {
       known.name = name;
@@ -119,7 +120,7 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
 
 export function setConnected(state: GameState, id: string, connected: boolean): GameState {
   return update(state, (s) => {
-    const p = find(s, id) ?? s.queue.find((q) => q.id === id);
+    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
     if (p) p.connected = connected;
   });
 }
@@ -127,7 +128,7 @@ export function setConnected(state: GameState, id: string, connected: boolean): 
 /** Busted players ask to be dealt back in with a fresh stack. */
 export function rejoinQueue(state: GameState, id: string, name: string, now: number): GameState {
   const p = find(state, id);
-  if (!state.started || state.queue.length >= MAX_QUEUE || state.queue.some((q) => q.id === id)) return state;
+  if (!state.started || isSpectator(state, id) || state.queue.length >= MAX_QUEUE || state.queue.some((q) => q.id === id)) return state;
   if (p && (p.chips > 0 || BETTING_PHASES.includes(state.phase))) return state; // all-in is not busted
   return update(state, (s) => {
     s.lastActionAt = now;
@@ -138,6 +139,7 @@ export function rejoinQueue(state: GameState, id: string, name: string, now: num
 export function removePlayer(state: GameState, id: string, now: number): GameState {
   return update(state, (s) => {
     s.queue = s.queue.filter((q) => q.id !== id);
+    s.spectators = s.spectators.filter((w) => w.id !== id);
     const p = find(s, id);
     if (!p) return;
     if (!BETTING_PHASES.includes(s.phase)) {
@@ -149,6 +151,21 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
     p.folded = true;
     p.lastAction = 'Left';
     advance(s, now, p.seat, s.activeId !== id);
+  });
+}
+
+/** Watching the table, not playing. */
+export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
+
+/** Join to watch. A seated or queued player who comes back this way stays a player. */
+export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
+  const name = cleanName(rawName);
+  return update(state, (s) => {
+    s.lastActionAt = now;
+    const known = s.spectators.find((w) => w.id === id);
+    if (known) Object.assign(known, { name, connected: true });
+    else s.spectators.push({ id, name, connected: true });
   });
 }
 
@@ -370,10 +387,11 @@ export function hostTick(state: GameState, now: number): GameState {
   return state;
 }
 
-/** What one viewer may see: no deck, no opponents' hole cards before showdown. */
+/** What one viewer may see: no deck, and no opponents' hole cards before showdown unless they are a spectator. */
 export function maskFor(state: GameState, viewerId: string): GameState {
   return update(state, (s) => {
     s.deck = [];
+    if (isSpectator(s, viewerId)) return; // spectators see every card
     for (const p of s.players) if (p.id !== viewerId && !p.showCards) p.hole = p.hole.map(() => '??');
   });
 }

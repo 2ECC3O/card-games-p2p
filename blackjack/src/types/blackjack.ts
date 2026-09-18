@@ -61,6 +61,8 @@ export interface GameState {
   /** Seated players, sorted by seat (max 7). Play goes in seat order. */
   players: Player[];
   queue: QueuedPlayer[];
+  /** Watching, not playing. They see every card. */
+  spectators: QueuedPlayer[];
   dealer: Card[];
   /** Host only; stripped from every view. */
   shoe: Card[];

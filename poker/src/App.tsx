@@ -1,4 +1,4 @@
-import { QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
+import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import ActionControls from './components/ActionControls';
 import InviteCard from './components/InviteCard';
@@ -14,13 +14,13 @@ const randomHex = (bytes: number) =>
   Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 /** Per-tab identity so a reload reconnects to the same seat within the grace period. */
-function identity(name: string): Identity {
+function identity(name: string, watch = false): Identity {
   const read = (key: string, size: number) => {
     let v = sessionStorage.getItem(key);
     if (!v) sessionStorage.setItem(key, (v = randomHex(size)));
     return v;
   };
-  return { id: read('poker.id', 8), secret: read('poker.secret', 16), name };
+  return { id: read('poker.id', 8), secret: read('poker.secret', 16), name, watch };
 }
 
 function parseBlinds(text: string): BlindLevel[] | null {
@@ -52,6 +52,9 @@ const IN_APP_BROWSER = /FBAN|FBAV|FB_IAB|Instagram|\bLine\/|Snapchat|TikTok|musi
 
 const joinUrl = (code: string) => `${location.origin}${location.pathname}?room=${code}`;
 
+/** Typing this as your name joins (or creates) a room as a big-screen display for viewers and commentators. */
+const isTournament = (name: string) => name.trim().toUpperCase() === 'TOURNAMENT';
+
 export default function App() {
   const urlRoom = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
   const [name, setName] = useState(() => localStorage.getItem('poker.name') ?? '');
@@ -82,6 +85,7 @@ export default function App() {
     setGame(null);
     setNotice(message);
     sessionStorage.removeItem('poker.room');
+    sessionStorage.removeItem('poker.watch');
     history.replaceState(null, '', location.pathname);
   }, []);
 
@@ -96,6 +100,7 @@ export default function App() {
     netRef.current = n;
     setNet(n);
     sessionStorage.setItem('poker.room', n.roomCode);
+    if (n.me.watch) sessionStorage.setItem('poker.watch', '1');
     history.replaceState(null, '', `?room=${n.roomCode}`);
   };
 
@@ -128,7 +133,7 @@ export default function App() {
     for (let attempt = 0; attempt < 3; attempt++) {
       const roomCode = randomRoomCode();
       try {
-        enter(await PokerNet.host(roomCode, identity(player), createGame(roomCode, config, Date.now()), events));
+        enter(await PokerNet.host(roomCode, identity(player, isTournament(player)), createGame(roomCode, config, Date.now()), events));
         break;
       } catch (err) {
         if ((err as { type?: string }).type !== 'unavailable-id') {
@@ -140,11 +145,11 @@ export default function App() {
     setBusy(null);
   };
 
-  const joinRoom = async (roomCode: string, player: string) => {
+  const joinRoom = async (roomCode: string, player: string, watch = false) => {
     setBusy('join');
     setNotice(null);
     try {
-      enter(await PokerNet.join(roomCode, identity(player), events));
+      enter(await PokerNet.join(roomCode, identity(player, watch || isTournament(player)), events));
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Couldn't join the room.");
     }
@@ -157,14 +162,14 @@ export default function App() {
     const roomCode = code.trim().toUpperCase();
     if (!player) return;
     if (!/^[A-Z0-9]{6}$/.test(roomCode)) return setNotice('Room codes are 6 letters or digits.');
-    void joinRoom(roomCode, player);
+    void joinRoom(roomCode, player, (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'watch');
   };
 
   // Reload during a game: reconnect to the same room with the same identity.
   useEffect(() => {
     const stored = localStorage.getItem('poker.name');
     if (!autoJoined.current && urlRoom && stored && sessionStorage.getItem('poker.room') === urlRoom) {
-      void joinRoom(urlRoom, stored);
+      void joinRoom(urlRoom, stored, sessionStorage.getItem('poker.watch') === '1');
     }
     autoJoined.current = true;
     return () => netRef.current?.destroy();
@@ -251,10 +256,14 @@ export default function App() {
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <button disabled={busy !== null} className={`${button.primary} min-h-11 shrink-0 px-5`}>
+                <button name="mode" value="join" disabled={busy !== null} className={`${button.primary} min-h-11 shrink-0 px-5`}>
                   {busy === 'join' ? 'Joining…' : 'Join'}
                 </button>
+                <button name="mode" value="watch" disabled={busy !== null} className={`${button.quiet} min-h-11 shrink-0 px-4`}>
+                  Watch
+                </button>
               </div>
+              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Spectators see every card.</p>
             </form>
           </div>
 
@@ -314,7 +323,8 @@ export default function App() {
   const isHost = net.role === 'host';
   const me = game.players.find((p) => p.id === net.me.id);
   const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
-  const outOfChips = game.started && (!me || (me.chips === 0 && !BETTING_PHASES.includes(game.phase)));
+  const watching = game.spectators.some((w) => w.id === net.me.id);
+  const outOfChips = game.started && !watching && (!me || (me.chips === 0 && !BETTING_PHASES.includes(game.phase)));
   const seated = game.players.filter((p) => p.chips > 0).length;
   const url = joinUrl(game.roomCode);
   const statusColor = { hosting: 'bg-emerald-400', connected: 'bg-emerald-400', connecting: 'bg-amber-300', reconnecting: 'bg-rose-400' }[status];
@@ -360,6 +370,13 @@ export default function App() {
           )}
         </div>
 
+        {game.spectators.length > 0 && (
+          <span className="hidden items-center gap-1.5 text-sm text-slate-400 sm:flex" title={game.spectators.map((w) => w.name).join(', ')}>
+            <EyeIcon size={16} aria-hidden />
+            {game.spectators.length}
+            <span className="sr-only"> watching</span>
+          </span>
+        )}
         <button onClick={toggleMute} className={`${button.quiet} size-10`} aria-pressed={muted} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
           {muted ? <SpeakerSlashIcon size={18} aria-hidden /> : <SpeakerHighIcon size={18} aria-hidden />}
         </button>
@@ -394,6 +411,10 @@ export default function App() {
               {seated < 2 ? 'Waiting for a second player' : `Start game with ${seated} players`}
             </button>
           </div>
+        ) : watching ? (
+          <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
+            {game.started ? "You're watching. You see every player's cards." : "You're watching. The game starts when the host presses Start."}
+          </p>
         ) : queuePos >= 0 ? (
           <p className="px-3 pb-3 text-center text-sm text-slate-300 sm:text-base" aria-live="polite">
             You're number {queuePos + 1} in the queue. You'll be dealt in when a seat opens.
@@ -439,6 +460,7 @@ export default function App() {
                 {[
                   ...game.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, place: `Seat ${p.seat + 1}` })),
                   ...game.queue.map((q, i) => ({ id: q.id, name: q.name, place: `Queue ${i + 1}` })),
+                  ...game.spectators.map((w) => ({ id: w.id, name: w.name, place: 'Watching' })),
                 ].map(({ id, name, place }) => (
                   <li key={id} className="flex min-h-10 items-center gap-2 text-sm">
                     <span className="min-w-0 flex-1 truncate">{id === net.me.id ? 'You' : name}</span>

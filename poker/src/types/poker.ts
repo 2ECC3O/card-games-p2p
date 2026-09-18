@@ -71,6 +71,8 @@ export interface GameState {
   /** Seated players, sorted by seat (max 10). */
   players: Player[];
   queue: QueuedPlayer[];
+  /** Watching, not playing. They see every card. */
+  spectators: QueuedPlayer[];
   board: Card[];
   /** Host only; stripped from every view. */
   deck: Card[];

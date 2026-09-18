@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  addPlayer, applyAction, BET_MS, createGame, hostTick, isBroke, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, startGame, WHEEL,
+  addPlayer, addSpectator, applyAction, BET_MS, createGame, hostTick, isBroke, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, startGame, WHEEL,
 } from './rouletteEngine';
 import type { GameState, PlayerAction, Spot } from '../types/roulette';
 
@@ -125,5 +125,14 @@ s = addPlayer(s, 'late', 'Late', 1);
 assert.equal(s.queue.length, 1);
 for (let i = 0; i < 30; i++) s = addPlayer(s, `q${i}`, 'Q', 1);
 assert.equal(s.queue.length, 20);
+
+// ------------------------------------------------ spectators
+s = addSpectator(table(1), 'w', 'Watcher', 1);
+assert.equal(s.players.length, 1, 'watching takes no seat');
+assert.throws(() => bet(s, 'w', 'red', 10), /not seated/);
+s = act(s, 'p0', { type: 'done' });
+assert.equal(s.round, 2, 'the spectator does not hold up the round');
+s = addPlayer(s, 'w', 'Watcher', 2);
+assert.deepEqual([s.spectators.length, s.queue[0]?.id], [0, 'w'], 'a spectator who joins to play queues for a seat');
 
 console.log('engine: all checks passed');
