@@ -52,7 +52,7 @@ function Wheel({ result, spinKey, landed }: { result: number | null; spinKey: st
   }, [spinKey]);
 
   return (
-    <svg viewBox="-100 -100 200 200" className="size-32 shrink-0 drop-shadow-xl sm:size-40 tall:size-56" role="img" aria-label={landed && result !== null ? `The wheel stopped on ${result}` : 'Roulette wheel'}>
+    <svg viewBox="-100 -100 200 200" className="size-32 shrink-0 drop-shadow-xl sm:size-40 tall:size-56 [@media(max-height:44rem)]:size-24" role="img" aria-label={landed && result !== null ? `The wheel stopped on ${result}` : 'Roulette wheel'}>
       <circle r="99.5" fill="#451a03" />
       <g style={{ transform: `rotate(${angle}deg)`, transition: reduced ? 'none' : `transform ${SPIN_MS - 400}ms cubic-bezier(0.12, 0.6, 0.08, 1)` }}>
         {WHEEL.map((n, i) => (
@@ -134,7 +134,7 @@ function Board({ state, heroId, canBet, onPlace, landed }: { state: GameState; h
     <div
       className={`grid overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_top,#991b1b_0%,#7f1d1d_80%)] shadow-[inset_0_0_32px_rgba(2,6,23,.45)] ring-4 ring-amber-950 ${
         upright
-          ? 'mx-auto w-full max-w-sm grid-cols-[repeat(3,minmax(0,1fr))_3.75rem_3.75rem] grid-rows-[repeat(14,2.1rem)]'
+          ? 'mx-auto max-h-[31.5rem] w-full max-w-sm flex-1 grid-cols-[repeat(3,minmax(0,1fr))_3.75rem_3.75rem] grid-rows-[repeat(14,minmax(1.35rem,1fr))]'
           : 'grid-cols-[repeat(14,minmax(0,1fr))] grid-rows-[repeat(3,2.75rem)_2.25rem_2.25rem] tall:grid-rows-[repeat(3,3.5rem)_2.75rem_2.75rem]'
       }`}
     >
@@ -203,11 +203,16 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
     return () => clearTimeout(t);
   }, [settled, state.round]);
   const landed = settled && landedRound === state.round;
+  // On a short screen the board can push the wheel out of view; bring it back for the spin.
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (settled) top.current?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [settled, state.round]);
   const history = settled && !landed ? state.history.slice(1) : state.history;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-3 pb-3 sm:gap-4 sm:px-5">
-      <div className="flex items-center gap-4 sm:gap-6">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3 px-3 pb-3 sm:gap-4 sm:px-5">
+      <div ref={top} className="flex shrink-0 items-center gap-4 scroll-mt-2 sm:gap-6">
         <Wheel result={settled ? state.result : null} spinKey={`${state.round}-${state.phase}`} landed={landed} />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5" aria-live="polite">
           {!state.started ? (
@@ -242,7 +247,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
         </div>
       </div>
 
-      <ul className="flex flex-wrap justify-center gap-1.5 sm:gap-2" aria-label="Players">
+      <ul className="flex shrink-0 flex-wrap justify-center gap-1.5 sm:gap-2" aria-label="Players">
         {state.players.map((p) => {
           const stake = staked(p.bets);
           const net = p.payout - stake;
