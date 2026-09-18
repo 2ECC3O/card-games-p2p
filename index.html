@@ -4,16 +4,140 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#020617" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>" />
-    <title>Hold'em P2P</title>
-    <meta name="description" content="Play Texas Hold'em with friends in the browser. Virtual chips, no sign-up." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
+    <title>Card Games P2P</title>
+    <meta name="description" content="Texas Hold'em and blackjack with friends in the browser. Virtual chips, no sign-up." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Hold'em P2P" />
-    <meta property="og:description" content="Play Texas Hold'em with friends in the browser. Virtual chips, no sign-up." />
+    <meta property="og:title" content="Card Games P2P" />
+    <meta property="og:description" content="Texas Hold'em and blackjack with friends in the browser. Virtual chips, no sign-up." />
     <meta name="twitter:card" content="summary" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 2.5rem 1rem;
+        color: #f8fafc;
+        background: radial-gradient(ellipse at top, #1e293b 0%, #020617 62%) #020617;
+      }
+      main {
+        width: 100%;
+        max-width: 56rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2.25rem, 7vw, 3.75rem);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+      }
+      h1 span {
+        color: #94a3b8;
+      }
+      .lead {
+        margin: 0.5rem 0 2rem;
+        max-width: 38ch;
+        color: #cbd5e1;
+        font-size: 1.05rem;
+        text-wrap: balance;
+      }
+      .games {
+        display: grid;
+        gap: 1rem;
+      }
+      @media (min-width: 40rem) {
+        .games {
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+        }
+      }
+      a {
+        --accent: #34d399;
+        --felt: #14532d;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        color: inherit;
+        text-decoration: none;
+        background: radial-gradient(ellipse at top, var(--felt) 0%, rgb(15 23 42 / 0.6) 75%);
+        box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+        transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+      }
+      a.blackjack {
+        --accent: #60a5fa;
+        --felt: #1e3a8a;
+      }
+      a:hover {
+        transform: translateY(-2px);
+        box-shadow: inset 0 0 0 2px var(--accent);
+      }
+      a:active {
+        transform: scale(0.98);
+      }
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .suit {
+        font-size: 2rem;
+        line-height: 1;
+        color: var(--accent);
+      }
+      h2 {
+        margin: 0.5rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+      a p {
+        margin: 0;
+        color: #cbd5e1;
+      }
+      .play {
+        margin-top: 0.75rem;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        a {
+          transition: none;
+        }
+        a:hover,
+        a:active {
+          transform: none;
+        }
+      }
+    </style>
   </head>
-  <body class="bg-slate-950">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body>
+    <main>
+      <h1>Card Games <span>P2P</span></h1>
+      <p class="lead">Play with friends right in the browser. Virtual chips, no sign-up.</p>
+      <div class="games">
+        <a href="poker/">
+          <span class="suit" aria-hidden="true">♠</span>
+          <h2>Hold'em</h2>
+          <p>Texas Hold'em for up to 10 players, with rising blinds.</p>
+          <span class="play">Play Hold'em →</span>
+        </a>
+        <a href="blackjack/" class="blackjack">
+          <span class="suit" aria-hidden="true">♣</span>
+          <h2>Blackjack</h2>
+          <p>Up to 7 players against the house. Blackjack pays 3 to 2.</p>
+          <span class="play">Play Blackjack →</span>
+        </a>
+      </div>
+    </main>
   </body>
 </html>

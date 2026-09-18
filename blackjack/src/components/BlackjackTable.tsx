@@ -1,0 +1,300 @@
+import { WifiSlashIcon } from '@phosphor-icons/react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { BET_MS, handValue, isBlackjack, TURN_MS } from '../engine/blackjackEngine';
+import type { Card, GameState, Hand, Outcome, Player } from '../types/blackjack';
+
+interface Props {
+  state: GameState;
+  heroId: string;
+  /** Shown in the middle of the table before the game starts. */
+  invite: ReactNode;
+}
+
+const SUIT = { s: '♠', h: '♥', d: '♦', c: '♣' } as const;
+
+// `tall:` = wide AND tall screen (see index.css), so short laptop screens keep the mid sizes.
+const SIZE = {
+  seat: 'h-12 w-9 text-base sm:h-16 sm:w-12 sm:text-xl tall:h-18 tall:w-13',
+  large: 'h-16 w-12 text-xl sm:h-20 sm:w-14 sm:text-2xl tall:h-24 tall:w-17 tall:text-3xl',
+};
+/** Cards in a hand overlap, leaving the corner index of each one visible. */
+const OVERLAP = { seat: '-space-x-4 sm:-space-x-6 tall:-space-x-7', large: '-space-x-6 sm:-space-x-7 tall:-space-x-9' };
+const DEAL_GAP = 350; // ms between the dealer's cards as they come out after the players have played
+
+function CardView({ card, size, className = '', style }: { card: Card; size: keyof typeof SIZE; className?: string; style?: CSSProperties }) {
+  const base = `${SIZE[size]} ${className} relative shrink-0 rounded-md shadow-md shadow-black/30`;
+  if (card === '??') {
+    return <div style={style} className={`${base} border border-blue-200/15 bg-[repeating-linear-gradient(45deg,#1e3a8a_0_5px,#1e40af_5px_10px)]`} />;
+  }
+  const red = card[1] === 'h' || card[1] === 'd';
+  const suit = SUIT[card[1] as keyof typeof SUIT];
+  return (
+    <div style={style} className={`${base} grid place-items-center bg-slate-50 leading-none font-semibold ${red ? 'text-rose-600' : 'text-slate-900'}`}>
+      <span className="absolute top-0.5 left-0.5 flex flex-col items-center text-[0.6em] sm:top-1 sm:left-1">
+        <span>{card[0] === 'T' ? '10' : card[0]}</span>
+        <span>{suit}</span>
+      </span>
+      <span className="mt-2 text-[1.1em]">{suit}</span>
+    </div>
+  );
+}
+
+/** Draining timer bar. CSS-only; keyed by deadline so it restarts each time. */
+function TimerBar({ deadline, total, className }: { deadline: number; total: number; className: string }) {
+  const elapsed = total - Math.max(0, deadline - Date.now());
+  return (
+    <div className={`h-1.5 overflow-hidden rounded-full bg-slate-950 ring-1 ring-black/40 ${className}`} role="presentation">
+      <div className="turn-timer h-full w-full" style={{ animationDuration: `${total}ms`, animationDelay: `-${elapsed}ms` }} />
+    </div>
+  );
+}
+
+function SecondsLeft({ deadline }: { deadline: number }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const tone = left <= 5 ? 'text-rose-300' : left <= 10 ? 'text-amber-200' : 'text-blue-200';
+  return (
+    <div className={`font-mono text-[11px] font-semibold tall:text-xs ${tone}`} aria-label={`${left} seconds left`}>
+      {left}s
+    </div>
+  );
+}
+
+const CHIP = <span className="size-4 shrink-0 rounded-full border-2 border-dashed border-amber-100 bg-amber-400 shadow-sm sm:size-5" aria-hidden />;
+
+/** A chip stack with an amount. */
+function Chips({ amount }: { amount: number }) {
+  return (
+    <div className="flex w-max items-center gap-1.5 rounded-full bg-slate-950/75 py-0.5 pr-2.5 pl-0.5 text-xs font-semibold text-slate-50 shadow shadow-black/40 sm:text-sm">
+      {CHIP}
+      <span className="font-mono">{amount}</span>
+    </div>
+  );
+}
+
+const OUTCOME: Record<Outcome, [string, string]> = {
+  blackjack: ['Blackjack', 'bg-blue-400 text-blue-950'],
+  win: ['Win', 'bg-blue-400 text-blue-950'],
+  push: ['Push', 'bg-slate-200 text-slate-900'],
+  lose: ['Lose', 'bg-slate-950/75 text-slate-400'],
+  bust: ['Bust', 'bg-slate-950/75 text-rose-300'],
+};
+
+/** "18", "7/17" for a soft total still in play, "BJ", "Bust". */
+function totalLabel(cards: Card[], split: boolean, final: boolean) {
+  const { total, soft } = handValue(cards);
+  if (!split && isBlackjack(cards)) return 'BJ';
+  if (total > 21) return 'Bust';
+  return soft && !final && total < 21 && !cards.includes('??') ? `${total - 10}/${total}` : `${total}`;
+}
+
+function HandView({ hand, size, active, round, revealDelay }: { hand: Hand; size: keyof typeof SIZE; active: boolean; round: number; revealDelay: number }) {
+  const settled = hand.outcome !== null;
+  const [label, tone] = settled ? OUTCOME[hand.outcome!] : ['', ''];
+  const profit = hand.payout - hand.bet;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className={`relative rounded-lg p-0.5 transition ${active ? 'ring-2 ring-blue-300' : ''}`}>
+        <div className={`flex ${OVERLAP[size]}`}>
+          {hand.cards.map((c, i) => (
+            // Keyed by card too, so the card that replaces a split one deals in again.
+            <CardView key={`${round}-${i}-${c}`} card={c} size={size} className="deal-card" />
+          ))}
+        </div>
+        {hand.cards.length > 0 && (
+          <span className="absolute -top-2 -right-2 rounded-full bg-slate-950 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-50 ring-1 ring-white/20 tall:text-xs">
+            {totalLabel(hand.cards, hand.split, hand.done)}
+          </span>
+        )}
+      </div>
+      {/* The chip animations centre on their anchor, so the chip sits absolutely in a fixed-height slot. */}
+      <div className="relative h-6 w-full sm:h-7">
+        {settled ? (
+          <>
+            {profit < 0 && (
+              <div className="chip-lost absolute top-1/2 left-1/2" style={{ animationDelay: `${revealDelay}ms` }} aria-hidden>
+                <Chips amount={hand.bet} />
+              </div>
+            )}
+            <div
+              className={`rise-in absolute inset-x-0 top-0 mx-auto w-max rounded-full px-2.5 py-0.5 text-xs font-semibold shadow shadow-black/40 sm:text-sm ${tone}`}
+              style={{ animationDelay: `${revealDelay}ms` }}
+            >
+              {label}
+              {profit > 0 && <span className="font-mono"> +{profit}</span>}
+            </div>
+          </>
+        ) : (
+          // Re-keyed on the amount, so a double tosses chips in again.
+          <div key={`${round}-${hand.bet}`} className="chip-from absolute top-1/2 left-1/2" style={{ '--dx': 0, '--dy': 6 } as CSSProperties}>
+            <Chips amount={hand.bet} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Seat({ p, state, isHero, revealDelay }: { p: Player; state: GameState; isHero: boolean; revealDelay: number }) {
+  const active = state.activeId === p.id && state.phase === 'playing';
+  const deadline = active ? state.deadline : null;
+  const betting = state.phase === 'betting' && p.hands.length === 0;
+  const satOut = (state.phase === 'playing' || state.phase === 'settled') && p.hands.length === 0;
+  const won = state.phase === 'settled' && p.hands.reduce((n, h) => n + h.payout - h.bet, 0) > 0;
+  return (
+    <div className={`flex flex-col items-center transition-opacity duration-300 ${satOut || p.left ? 'opacity-45' : ''}`}>
+      {p.hands.length > 0 && (
+        <div className="mb-1.5 flex items-end gap-2 sm:gap-3">
+          {p.hands.map((h, i) => (
+            <HandView key={i} hand={h} size={isHero ? 'large' : 'seat'} active={active && p.hands.length > 1 && state.activeHand === i} round={state.round} revealDelay={revealDelay} />
+          ))}
+        </div>
+      )}
+      <div
+        className={`relative w-18 rounded-xl px-2 py-1 text-center shadow-lg shadow-black/40 transition duration-300 sm:w-24 sm:px-2.5 tall:w-32 tall:py-1.5 ${
+          active
+            ? 'bg-slate-900 ring-2 ring-blue-300 shadow-blue-400/20'
+            : won
+              ? 'bg-blue-950 ring-2 ring-blue-400'
+              : 'bg-slate-950/90 ring-1 ring-white/10'
+        }`}
+      >
+        {deadline && <TimerBar key={`bar-${deadline}`} deadline={deadline} total={TURN_MS} className="absolute inset-x-2 -bottom-2.5" />}
+        <div className="flex items-center justify-center gap-1 truncate text-xs font-medium text-slate-200 tall:text-sm">
+          {!p.connected && <WifiSlashIcon size={12} weight="bold" className="shrink-0 text-rose-300" aria-label="Disconnected" />}
+          <span className="truncate">{isHero ? 'You' : p.name}</span>
+        </div>
+        <div className="font-mono text-sm font-semibold text-slate-50 tall:text-base">{p.chips}</div>
+        {deadline ? (
+          <SecondsLeft key={`secs-${deadline}`} deadline={deadline} />
+        ) : (
+          (betting || satOut) && <div className="truncate text-[11px] text-slate-400 tall:text-xs">{betting ? 'Betting…' : 'Sitting out'}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Seat anchor (bottom centre of the seat) in percent of the table. Seats follow the curved edge of the table
+ * from left to right, in the order they play; with many players the ends climb up the sides.
+ */
+function seatPoint(i: number, n: number) {
+  const step = n > 1 ? Math.min(0.7, (Math.PI * 1.1) / (n - 1)) : 0;
+  const angle = Math.PI / 2 + ((n - 1) / 2 - i) * step;
+  return { x: 50 + 39 * Math.cos(angle), y: 40 + 50 * Math.sin(angle) };
+}
+const DEALER = { x: 50, y: 16 };
+
+export default function BlackjackTable({ state, heroId, invite }: Props) {
+  // Once the players are done, the hole card flips and the dealer's extra cards come out one by one;
+  // results wait until the last one lands. Worked out once per round so re-renders don't restart it.
+  const dealerShown = useRef(0);
+  const reveal = useRef({ round: -1, from: 0, delay: 0 });
+  if (state.phase === 'settled' && reveal.current.round !== state.round) {
+    const from = dealerShown.current;
+    reveal.current = { round: state.round, from, delay: Math.max(0, state.dealer.length - from) * DEAL_GAP + 300 };
+  }
+  useEffect(() => {
+    dealerShown.current = state.dealer.length;
+  });
+  const settled = state.phase === 'settled';
+  const { from, delay } = settled ? reveal.current : { from: state.dealer.length, delay: 0 };
+
+  const players = state.players;
+  const queuePos = state.queue.findIndex((q) => q.id === heroId);
+  const dealerLabel = state.dealer.length > 0 ? totalLabel(state.dealer, false, state.phase === 'settled') : null;
+
+  return (
+    <div className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
+      <div className="absolute inset-x-[7%] top-[2%] bottom-[8%] rounded-t-[3rem] rounded-b-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_top,#1d4ed8_0%,#1e3a8a_80%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
+
+      {/* The dealer, at the flat edge of the table. */}
+      {state.dealer.length > 0 && (
+        <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${DEALER.x}%`, top: `${DEALER.y}%` }}>
+          <div className="relative flex gap-1 [perspective:600px] sm:gap-1.5">
+            {state.dealer.map((c, i) => (
+              <CardView
+                key={`${state.round}-${i}-${c}`}
+                card={c}
+                size="large"
+                className="deal-card"
+                style={{ animationDelay: `${settled ? Math.max(0, i - from) * DEAL_GAP : 0}ms` }}
+              />
+            ))}
+            {dealerLabel && (
+              <span
+                key={`${state.round}-${dealerLabel}`}
+                className="rise-in absolute -top-2 -right-3 rounded-full bg-slate-950 px-2 py-0.5 font-mono text-xs font-semibold text-slate-50 ring-1 ring-white/20 tall:text-sm"
+                style={{ animationDelay: `${settled ? delay - 300 : 0}ms` }}
+              >
+                {dealerLabel}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="absolute inset-x-0 top-[30%] flex flex-col items-center text-center">
+        {!state.started ? (
+          <div className="rise-in flex flex-col items-center gap-2">
+            {invite}
+            <p className="text-xs text-blue-50/70 sm:text-sm">
+              {players.length} seated{state.queue.length > 0 && `, ${state.queue.length} in queue`}
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-[10px] font-semibold tracking-[0.25em] text-blue-100/45 uppercase sm:text-xs tall:text-sm">Blackjack pays 3 to 2</p>
+            <p className="mt-0.5 text-[10px] tracking-wider text-blue-100/35 uppercase sm:text-xs">
+              Dealer stands on 17 · Minimum bet <span className="font-mono">{state.config.minBet}</span>
+            </p>
+            {state.phase === 'betting' && state.deadline && (
+              <div className="rise-in mt-3 flex w-40 flex-col items-center gap-1.5 sm:w-52">
+                <p className="text-sm font-semibold text-blue-50 sm:text-base">Place your bets</p>
+                <TimerBar key={`bet-${state.deadline}`} deadline={state.deadline} total={BET_MS} className="w-full" />
+              </div>
+            )}
+            {state.phase === 'waiting' && <p className="mt-3 text-sm text-blue-50/80">Waiting for players…</p>}
+          </>
+        )}
+      </div>
+
+      {players.map((p, i) => {
+        const point = seatPoint(i, players.length);
+        return (
+          <div key={p.id} className="absolute -translate-x-1/2 -translate-y-full" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
+            <Seat p={p} state={state} isHero={p.id === heroId} revealDelay={delay} />
+          </div>
+        );
+      })}
+
+      {/* Winnings slide from the dealer to each winner's seat. */}
+      {settled &&
+        players.flatMap((p, i) => {
+          const paid = p.hands.reduce((n, h) => n + h.payout, 0);
+          if (paid === 0) return [];
+          const point = seatPoint(i, players.length);
+          const travel = { '--dx': point.x - DEALER.x, '--dy': point.y - 8 - DEALER.y, animationDelay: `${delay + 400}ms` } as CSSProperties;
+          return (
+            <div
+              key={`${state.round}-${p.id}`}
+              aria-hidden
+              className="pot-to-winner pointer-events-none absolute"
+              style={{ left: `${DEALER.x}%`, top: `${DEALER.y}%`, ...travel }}
+            >
+              <Chips amount={paid} />
+            </div>
+          );
+        })}
+
+      {state.queue.length > 0 && queuePos < 0 && (
+        <p className="absolute top-1 left-3 text-xs text-slate-400 tall:text-sm">In queue: {state.queue.map((q) => q.name).join(', ')}</p>
+      )}
+    </div>
+  );
+}
