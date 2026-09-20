@@ -11,7 +11,8 @@ import { sha256 } from './sha256';
 // v2: messages are compressed binary (see codec.ts) instead of plain JSON.
 // v3: secret fingerprints in snapshots, 'closed' message, host can remove players.
 // v4: spectators (hello carries 'watch').
-const PREFIX = 'p2p-holdem-v4-';
+// v5: completed-hand win counts travel with player state.
+const PREFIX = 'p2p-holdem-v5-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;

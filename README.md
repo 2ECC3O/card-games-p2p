@@ -21,6 +21,14 @@ Poker, blackjack and roulette you play with friends in the browser. Free, fake c
 
 Your friends don't need to be on your Wi-Fi. They can join from anywhere, mobile data included.
 
+## Tournament display
+
+Type **TOURNAMENT** as the display name when creating or joining a room. That browser hosts or watches without taking a seat and shows the table beside a live chip leaderboard, action feed, and invite QR code. On a phone, scroll below the table for the display panel.
+
+Poker also shows each seated player's **hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
+
+This is a display for one game room. The usual game rules still apply; it does not run brackets, cross-room scores, or elimination rules. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
+
 ## What if...
 
 | If... | Then |

@@ -250,8 +250,7 @@ function Ball({ n, big = false }: { n: number; big?: boolean }) {
   );
 }
 
-export default function RouletteTable({ state, heroId, invite, canBet, onPlace }: Props) {
-  const upright = useMedia('(orientation: portrait)'); // portrait screens: the board stands upright, the wheel at its top
+export function useLanded(state: GameState) {
   // Every screen spins its wheel when it first hears the result, and shows the outcome once the wheel stops.
   const [landedRound, setLandedRound] = useState(-1);
   const settled = state.phase === 'settled';
@@ -260,7 +259,13 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
     const t = setTimeout(() => setLandedRound(state.round), reducedMotion() ? 300 : SPIN_MS);
     return () => clearTimeout(t);
   }, [settled, state.round]);
-  const landed = settled && landedRound === state.round;
+  return settled && landedRound === state.round;
+}
+
+export default function RouletteTable({ state, heroId, invite, canBet, onPlace }: Props) {
+  const upright = useMedia('(orientation: portrait)'); // portrait screens: the board stands upright, the wheel at its top
+  const landed = useLanded(state);
+  const settled = state.phase === 'settled';
   // On a short screen the board can push the wheel out of view; bring it back for the spin.
   const wheelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

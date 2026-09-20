@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import ActionControls from './components/ActionControls';
 import InviteCard from './components/InviteCard';
 import PokerTable from './components/PokerTable';
+import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import { BETTING_PHASES, type BlindLevel, type GameState, type TableConfig } from './types/poker';
 import { createGame } from './engine/pokerEngine';
@@ -264,7 +265,7 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Spectators see every card.</p>
+              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
             </form>
           </div>
 
@@ -326,6 +327,7 @@ export default function App() {
   const me = game.players.find((p) => p.id === net.me.id);
   const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
   const watching = game.spectators.some((w) => w.id === net.me.id);
+  const display = watching && isTournament(net.me.name);
   const outOfChips = game.started && !watching && (!me || (me.chips === 0 && !BETTING_PHASES.includes(game.phase)));
   const seated = game.players.filter((p) => p.chips > 0).length;
   const url = joinUrl(game.roomCode);
@@ -396,15 +398,18 @@ export default function App() {
         </button>
       </header>
 
-      <section className="relative min-h-0 flex-1 px-1 sm:px-4" aria-label="Poker table">
-        <PokerTable
-          state={game}
-          heroId={net.me.id}
-          invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
-        />
-      </section>
+      <div className={`flex min-h-0 flex-1 ${display ? 'flex-col overflow-y-auto lg:flex-row lg:overflow-hidden' : ''}`}>
+        <section className={`relative flex-1 px-1 sm:px-4 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink lg:py-10' : 'min-h-0'}`} aria-label="Poker table">
+          <PokerTable
+            state={game}
+            heroId={net.me.id}
+            invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
+          />
+        </section>
+        {display && <Tournament state={game} url={url} />}
+      </div>
 
-      <footer className="min-h-[4.5rem] pt-1">
+      {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
         {myTurn ? (
           <ActionControls key={`${game.handNumber}-${game.phase}-${game.turnDeadline}`} state={game} heroId={net.me.id} onAction={(action) => net.act(action)} />
         ) : isHost && !game.started ? (
@@ -439,7 +444,7 @@ export default function App() {
                   : ''}
           </p>
         )}
-      </footer>
+      </footer>}
 
       <dialog
         ref={inviteRef}

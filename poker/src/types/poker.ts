@@ -37,12 +37,19 @@ export interface Player {
   /** Left the room; removed at the next hand. */
   left: boolean;
   lastAction: string | null;
+  /** Completed hands dealt to this player, including folds. */
+  handsPlayed: number;
+  /** Completed hands in which this player won at least one pot, including ties. */
+  handsWon: number;
 }
 
 export interface QueuedPlayer {
   id: string;
   name: string;
   connected: boolean;
+  /** Keep this player's hand record when they rebuy after busting. */
+  handsPlayed?: number;
+  handsWon?: number;
 }
 
 export interface Pot {

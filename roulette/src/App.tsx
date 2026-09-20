@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { BetControls, CHIPS } from './components/ActionControls';
 import RouletteTable from './components/RouletteTable';
 import InviteCard from './components/InviteCard';
+import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import type { GameState, Spot, TableConfig } from './types/roulette';
 import { createGame, isBroke } from './engine/rouletteEngine';
@@ -258,7 +259,7 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the wheel and bets without taking a seat.</p>
+              <p className="mt-2 text-sm text-slate-400">Watch follows without taking a seat. Use TOURNAMENT as your name for the scoreboard display.</p>
             </form>
           </div>
 
@@ -291,6 +292,7 @@ export default function App() {
   const isHost = net.role === 'host';
   const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
   const watching = game.spectators.some((w) => w.id === net.me.id);
+  const display = watching && isTournament(net.me.name);
   const broke = game.started && !watching && game.phase !== 'settled' && (!me || isBroke(game, me)); // not while the wheel spins
   const seated = game.players.length;
   const url = joinUrl(game.roomCode);
@@ -362,17 +364,20 @@ export default function App() {
         </button>
       </header>
 
-      <section className="relative min-h-0 flex-1 overflow-y-auto pt-1" aria-label="Roulette table">
-        <RouletteTable
-          state={game}
-          heroId={net.me.id}
-          invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
-          canBet={myBet}
-          onPlace={place}
-        />
-      </section>
+      <div className={`flex min-h-0 flex-1 ${display ? 'flex-col overflow-y-auto lg:flex-row lg:overflow-hidden' : ''}`}>
+        <section className={`relative flex-1 overflow-y-auto pt-1 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink' : 'min-h-0'}`} aria-label="Roulette table">
+          <RouletteTable
+            state={game}
+            heroId={net.me.id}
+            invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
+            canBet={myBet}
+            onPlace={place}
+          />
+        </section>
+        {display && <Tournament state={game} url={url} />}
+      </div>
 
-      <footer className="min-h-[4.5rem] pt-1">
+      {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
         {myBet ? (
           <BetControls state={game} heroId={net.me.id} chip={chip} onChip={setChip} onAction={(a) => net.act(a)} />
         ) : isHost && !game.started ? (
@@ -407,7 +412,7 @@ export default function App() {
                   : ''}
           </p>
         )}
-      </footer>
+      </footer>}
 
       <dialog
         ref={inviteRef}

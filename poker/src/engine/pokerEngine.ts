@@ -5,6 +5,7 @@ import {
   type GameState,
   type Player,
   type PlayerAction,
+  type QueuedPlayer,
   type TableConfig,
 } from '../types/poker';
 
@@ -67,13 +68,14 @@ function put(p: Player, amount: number) {
   if (p.chips === 0) p.allIn = true;
 }
 
-function seat(s: GameState, id: string, name: string, chips: number, connected: boolean) {
+function seat(s: GameState, id: string, name: string, chips: number, connected: boolean, record?: QueuedPlayer) {
   const taken = new Set(s.players.map((p) => p.seat));
   let free = 0;
   while (taken.has(free)) free++;
   s.players.push({
     id, name, seat: free, chips, hole: [], bet: 0, committed: 0, folded: false, allIn: false,
     acted: false, showCards: false, connected, left: false, lastAction: null,
+    handsPlayed: record?.handsPlayed ?? 0, handsWon: record?.handsWon ?? 0,
   });
   s.players.sort((a, b) => a.seat - b.seat);
 }
@@ -132,7 +134,7 @@ export function rejoinQueue(state: GameState, id: string, name: string, now: num
   if (p && (p.chips > 0 || BETTING_PHASES.includes(state.phase))) return state; // all-in is not busted
   return update(state, (s) => {
     s.lastActionAt = now;
-    s.queue.push({ id, name: cleanName(name), connected: true });
+    s.queue.push({ id, name: cleanName(name), connected: true, handsPlayed: p?.handsPlayed, handsWon: p?.handsWon });
   });
 }
 
@@ -185,7 +187,7 @@ export function startHand(s: GameState, now: number, deck?: Card[]) {
   s.players = s.players.filter((p) => p.chips > 0 && !p.left);
   while (s.players.length < MAX_SEATS && s.queue.length) {
     const q = s.queue.shift()!;
-    seat(s, q.id, q.name, s.config.startingStack, q.connected);
+    seat(s, q.id, q.name, s.config.startingStack, q.connected, q);
   }
   for (const p of s.players) {
     Object.assign(p, { hole: [], bet: 0, committed: 0, folded: false, allIn: false, acted: false, showCards: false, lastAction: null });
@@ -290,23 +292,28 @@ function finishHand(s: GameState, now: number) {
   if (live.length === 1) {
     live[0].chips += total;
     s.pots = [{ amount: total, eligible: [live[0].id], winners: [live[0].id], hand: null }];
-    return;
+  } else {
+    s.nextHandAt += live.length * REVEAL_MS + (5 - s.board.length) * RUNOUT_MS; // time to show it all before the result
+    while (s.board.length < 5) s.board.push(s.deck.pop()!);
+    const solved = new Map(live.map((p) => [p.id, Hand.solve([...p.hole, ...s.board])]));
+    for (const p of live) p.showCards = true;
+
+    const clockwise = (p: Player) => (p.seat - s.dealerSeat - 1 + MAX_SEATS) % MAX_SEATS; // odd chips go left of the button
+    s.pots = buildPots(s.players).map(({ amount, eligible: ids }) => {
+      const eligible = live.filter((p) => ids.includes(p.id));
+      const best = Hand.winners(eligible.map((p) => solved.get(p.id)!));
+      const winners = eligible.filter((p) => best.includes(solved.get(p.id)!)).sort((a, b) => clockwise(a) - clockwise(b));
+      const share = Math.floor(amount / winners.length);
+      winners.forEach((w, k) => (w.chips += share + (k < amount - share * winners.length ? 1 : 0)));
+      return { amount, eligible: eligible.map((p) => p.id), winners: winners.map((p) => p.id), hand: best[0].descr };
+    });
   }
-
-  s.nextHandAt += live.length * REVEAL_MS + (5 - s.board.length) * RUNOUT_MS; // time to show it all before the result
-  while (s.board.length < 5) s.board.push(s.deck.pop()!);
-  const solved = new Map(live.map((p) => [p.id, Hand.solve([...p.hole, ...s.board])]));
-  for (const p of live) p.showCards = true;
-
-  const clockwise = (p: Player) => (p.seat - s.dealerSeat - 1 + MAX_SEATS) % MAX_SEATS; // odd chips go left of the button
-  s.pots = buildPots(s.players).map(({ amount, eligible: ids }) => {
-    const eligible = live.filter((p) => ids.includes(p.id));
-    const best = Hand.winners(eligible.map((p) => solved.get(p.id)!));
-    const winners = eligible.filter((p) => best.includes(solved.get(p.id)!)).sort((a, b) => clockwise(a) - clockwise(b));
-    const share = Math.floor(amount / winners.length);
-    winners.forEach((w, k) => (w.chips += share + (k < amount - share * winners.length ? 1 : 0)));
-    return { amount, eligible: eligible.map((p) => p.id), winners: winners.map((p) => p.id), hand: best[0].descr };
-  });
+  // ponytail: one win per completed hand, even when a player wins several side pots.
+  const winners = new Set(s.pots.flatMap((pot) => pot.winners));
+  for (const p of s.players) if (p.hole.length) {
+    p.handsPlayed++;
+    if (winners.has(p.id)) p.handsWon++;
+  }
 }
 
 // ------------------------------------------------ actions

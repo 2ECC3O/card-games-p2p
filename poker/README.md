@@ -207,7 +207,7 @@ Things phones do differently:
 
 - **PeerJS** handles the connections. Its free public server is only used to introduce browsers to each
   other (signaling); the game itself travels directly between browsers over WebRTC data channels.
-- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v3-<ROOM CODE>`,
+- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v5-<ROOM CODE>`,
   runs the game engine, and is the only one allowed to change the game state.
 - **Clients** send their actions (fold, call, raise, rejoin, leave) to the host. The host checks them
   against the rules and sends every player their own view of the new state.
@@ -305,7 +305,7 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 - **Rules or payouts:** edit `pokerEngine.ts`, then add or update a check in `pokerEngine.test.ts` and run
   `npm test`. The random-play check at a full 10-seat table catches chips being created or lost.
 - **Message format:** clients and the host must run the same version. If you change messages in
-  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v3-`) so old and new
+  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v5-`) so old and new
   versions can't join each other's rooms.
 - **Look and layout:** everything is Tailwind classes in the components. `tall:` in class names means "wide
   and tall screen" (defined in `index.css`), used so short laptop screens keep the mid-size table.

@@ -173,6 +173,12 @@ const id = (s: GameState) => s.activeId!;
   s = removePlayer(s, other, 1);
   assert.equal(s.phase, 'showdown');
   assert.deepEqual(s.pots[0].winners, [s.players.find((p) => p.id !== other)!.id]);
+  assert.deepEqual(s.players.map((p) => [p.handsPlayed, p.handsWon]), s.players.map((p) => [1, p.id === s.pots[0].winners[0] ? 1 : 0]));
+  const winner = s.pots[0].winners[0];
+  s.players.find((p) => p.id === winner)!.chips = 0;
+  s = rejoinQueue(s, winner, 'Winner', 2);
+  startHand(s, 3);
+  assert.deepEqual([s.players.find((p) => p.id === winner)?.handsPlayed, s.players.find((p) => p.id === winner)?.handsWon], [1, 1], 'rebuy keeps the hand record');
 }
 
 // Names: invisible and text-reversing characters are removed, emoji sequences survive, 20 characters max.
@@ -239,6 +245,7 @@ const id = (s: GameState) => s.activeId!;
   while (s.phase !== 'showdown') s = applyAction(s, id(s), { type: 'check' }, 1);
   assert.deepEqual(s.pots.map((p) => [p.amount, p.winners]), [[165, ['p1', 'p2']]]);
   assert.deepEqual(s.players.map((p) => p.chips), [945, 1028, 1027], 'odd chip to p1, first left of the button');
+  assert.deepEqual(s.players.map((p) => [p.handsPlayed, p.handsWon]), [[1, 0], [1, 1], [1, 1]], 'a split pot counts as one win for each winner');
 }
 
 // ------------------------------------------------ spectators
