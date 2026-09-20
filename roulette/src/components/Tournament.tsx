@@ -1,4 +1,5 @@
 import { RED, SPIN_MS, staked } from '../engine/rouletteEngine';
+import { profitChance } from '../engine/odds';
 import type { GameState, Spot } from '../types/roulette';
 import { playerColor, useLanded } from './RouletteTable';
 import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
@@ -45,11 +46,13 @@ function describe(prev: GameState, s: GameState): TickerLine[] {
 export default function Tournament({ state, url }: { state: GameState; url: string }) {
   const feed = useTicker(state, describe);
   const landed = useLanded(state);
+  const chances = profitChance(state, landed);
   // Chips on the table count as the player's; winnings only once the wheel has stopped on screen.
   const leaders = state.players.map((p) => ({
     id: p.id,
     name: p.name,
     connected: p.connected,
+    chance: chances[p.id],
     color: playerColor(p.seat),
     chips: p.chips + (state.phase === 'settled' ? (landed ? 0 : staked(p.bets) - p.payout) : staked(p.bets)),
   }));

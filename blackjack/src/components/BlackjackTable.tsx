@@ -6,6 +6,7 @@ import type { Card, GameState, Hand, Outcome, Player } from '../types/blackjack'
 interface Props {
   state: GameState;
   heroId: string;
+  chances: Record<string, number>;
   /** Shown in the middle of the table before the game starts. */
   invite: ReactNode;
 }
@@ -204,8 +205,8 @@ function HandView({
 }
 
 function Seat({
-  p, state, isHero, revealDelay, dealDelay, dealEnd,
-}: { p: Player; state: GameState; isHero: boolean; revealDelay: number; dealDelay: (hand: number, card: number) => number | undefined; dealEnd: number }) {
+  p, state, isHero, revealDelay, dealDelay, dealEnd, chance,
+}: { p: Player; state: GameState; isHero: boolean; revealDelay: number; dealDelay: (hand: number, card: number) => number | undefined; dealEnd: number; chance?: number }) {
   const active = state.activeId === p.id && state.phase === 'playing';
   const deadline = active ? state.deadline : null;
   const betting = state.phase === 'betting' && p.hands.length === 0;
@@ -244,6 +245,7 @@ function Seat({
           <span className="truncate">{isHero ? 'You' : p.name}</span>
         </div>
         <div className="font-mono text-sm font-semibold text-slate-50 tall:text-base">{p.chips}</div>
+        {chance !== undefined && <div className="text-[10px] text-blue-100 tall:text-xs">Stand win ~{Math.round(chance * 100)}%</div>}
         {deadline ? (
           <SecondsLeft key={`secs-${deadline}`} deadline={deadline} />
         ) : (
@@ -265,7 +267,7 @@ function seatPoint(i: number, n: number) {
 }
 const DEALER = { x: 50, y: 16 };
 
-export default function BlackjackTable({ state, heroId, invite }: Props) {
+export default function BlackjackTable({ state, heroId, invite, chances }: Props) {
   // The opening deal goes one card at a time: each player in seat order, then the dealer, twice round.
   const players = state.players;
   const inPlay = players.filter((p) => p.hands.length > 0);
@@ -352,7 +354,7 @@ export default function BlackjackTable({ state, heroId, invite }: Props) {
                 <TimerBar key={`bet-${state.deadline}`} deadline={state.deadline} total={BET_MS} className="w-full" />
               </div>
             )}
-            {state.phase === 'waiting' && <p className="mt-3 text-sm text-blue-50/80">Waiting for players…</p>}
+            {state.phase === 'waiting' && <p className="mt-3 text-sm text-blue-50/80">{state.botMatch && players.length === 1 && !state.queue.length ? `${players[0].name} wins the match!` : 'Waiting for players…'}</p>}
           </>
         )}
       </div>
@@ -361,7 +363,7 @@ export default function BlackjackTable({ state, heroId, invite }: Props) {
         const point = seatPoint(i, players.length);
         return (
           <div key={p.id} className="absolute -translate-x-1/2 -translate-y-full" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
-            <Seat p={p} state={state} isHero={p.id === heroId} revealDelay={delay} dealDelay={playerDeal(p)} dealEnd={dealEnd} />
+            <Seat p={p} state={state} isHero={p.id === heroId} revealDelay={delay} dealDelay={playerDeal(p)} dealEnd={dealEnd} chance={chances[p.id]} />
           </div>
         );
       })}

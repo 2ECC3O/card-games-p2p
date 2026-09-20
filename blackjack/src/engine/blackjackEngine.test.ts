@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {
-  addPlayer, addSpectator, applyAction, BET_MS, createGame, handValue, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startRound, TURN_MS,
+  addBot, addPlayer, addSpectator, applyAction, BET_MS, createGame, handValue, hostTick, legalActions, maskFor, rejoinQueue, removePlayer, startGame, startRound, TURN_MS,
 } from './blackjackEngine';
+import { standProfitChance } from './odds';
 import type { Card, GameState, PlayerAction } from '../types/blackjack';
 
 // ------------------------------------------------ hand values
@@ -29,6 +30,35 @@ const act = (s: GameState, id: string, a: PlayerAction) => applyAction(s, id, a,
 const bet = (s: GameState, id: string, amount = 100) => act(s, id, { type: 'bet', amount });
 const chips = (s: GameState, id: string) => s.players.find((p) => p.id === id)!.chips;
 const hands = (s: GameState, id: string) => s.players.find((p) => p.id === id)!.hands;
+
+// Bots bet on host ticks, then leave permanently on bust; a bot match has one winner.
+{
+  let match = addBot(addPlayer(createGame('BOT001', config, 0), 'human', 'Human', 0), 0);
+  assert.equal(match.botMatch, true);
+  assert.equal(addPlayer(match, 'bot:8', 'Fake bot', 1), match);
+  match = startGame(match, 0);
+  match = hostTick(match, 1001);
+  assert.equal(match.players[1].hands[0].bet, config.minBet);
+  match.phase = 'playing';
+  match.dealer = ['9s', '7d'];
+  match.activeId = 'bot:1';
+  match.activeHand = 0;
+  match.deadline = TURN_MS;
+  match.players[1].hands[0].cards = ['Ts', '6c'];
+  match.shoe = ['2s'];
+  match = hostTick(match, 1001);
+  assert.deepEqual(match.players[1].hands[0].cards, ['Ts', '6c', '2s'], 'bot acts on its turn');
+  match.players[1].chips = 0;
+  startRound(match, 2000);
+  assert.deepEqual(match.players.map((p) => p.id), ['human']);
+  assert.equal(match.phase, 'waiting');
+  assert.equal(hostTick(match, 3000), match, 'winner remains stopped');
+
+  const odds = table(1, stack('Ts', '9h', 'Qd', '9s'));
+  const dealt = bet(odds, 'p0');
+  assert.equal(standProfitChance(dealt).p0, 1, '20 beats dealer 18 if standing');
+  assert.deepEqual(standProfitChance(maskFor(dealt, 'p0')), {}, 'masked dealer hole is not enough');
+}
 
 // Betting: every seated player bets, then the cards come out.
 let s = table(2, stack('Ts', '9h', '5c', '8s', '7c', 'Kd', '2d', '3d'));

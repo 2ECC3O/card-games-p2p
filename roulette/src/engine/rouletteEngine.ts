@@ -7,6 +7,8 @@ export const BET_MS = 25_000;
 export const SPIN_MS = 6_000;
 export const SETTLE_MS = 6_000;
 export const IDLE_MS = 5 * 60_000;
+export const isBot = (id: string) => /^bot:\d+$/.test(id);
+const BOT_DELAY_MS = 1_000;
 const HISTORY = 15;
 
 // ------------------------------------------------ the wheel
@@ -78,13 +80,14 @@ export function cleanName(name: unknown): string {
 
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
   return {
-    roomCode, config, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], result: null, history: [],
+    roomCode, config, started: false, botMatch: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], result: null, history: [],
     deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
 
 /** Seat before the game starts; afterwards (or when full) join the queue for the next round. */
 export function addPlayer(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (isBot(id)) return state;
   const name = cleanName(rawName);
   if (!find(state, id) && !state.queue.some((q) => q.id === id) && state.queue.length >= MAX_QUEUE && (state.started || state.players.length >= MAX_SEATS))
     return state; // table and queue full
@@ -100,6 +103,20 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
     } else {
       s.queue.push({ id, name, connected: true });
     }
+  });
+}
+
+/** Host-owned seat; queued during play and never replenished after elimination. */
+export function addBot(state: GameState, now: number): GameState {
+  if (state.players.length + state.queue.length >= MAX_SEATS) return state;
+  return update(state, (s) => {
+    const number = Math.max(0, ...[...s.players, ...s.queue].map((p) => Number(/^bot:(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1;
+    const id = `bot:${number}`;
+    const name = `Bot ${number}`;
+    s.botMatch = true;
+    if (!s.started) seat(s, id, name, s.config.startingStack, true);
+    else s.queue.push({ id, name, connected: true });
+    s.lastActionAt = now;
   });
 }
 
@@ -168,7 +185,7 @@ function startRound(s: GameState, now: number) {
   }
   for (const p of s.players) Object.assign(p, { bets: {}, done: false, payout: 0 });
   Object.assign(s, { result: null, deadline: null, nextRoundAt: null });
-  if (s.players.length === 0) {
+  if (s.players.length === 0 || (s.botMatch && s.players.length === 1 && !s.queue.length)) {
     s.phase = 'waiting';
     return;
   }
@@ -241,8 +258,18 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
 /** Host clock: close betting and spin, then open the next round. Returns the same object when nothing changed. */
 export function hostTick(state: GameState, now: number): GameState {
   const { phase, deadline } = state;
+  if (phase === 'betting' && deadline !== null && now >= deadline - BET_MS + BOT_DELAY_MS) {
+    const bot = state.players.find((p) => isBot(p.id) && !p.done && p.chips >= state.config.minBet);
+    if (bot) return update(state, (s) => {
+      const spot: Spot = randomInt(2) ? 'red' : 'black';
+      act(s, bot.id, { type: 'bet', spot, amount: s.config.minBet });
+      act(s, bot.id, { type: 'done' });
+      spinIfAllDone(s, now);
+    });
+  }
   if (phase === 'betting' && deadline !== null && now >= deadline) return update(state, (s) => spin(s, now)); // timeouts don't count as activity
-  const ready = state.players.some((p) => p.chips >= state.config.minBet) || state.queue.length > 0;
+  const ready = (state.players.some((p) => p.chips >= state.config.minBet) || state.queue.length > 0)
+    && (!state.botMatch || state.players.filter((p) => p.chips >= state.config.minBet).length + state.queue.length > 1);
   if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && ready))) {
     return update(state, (s) => startRound(s, now));
   }

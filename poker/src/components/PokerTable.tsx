@@ -285,7 +285,7 @@ export default function PokerTable({ state, heroId, invite, equity }: Props) {
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {state.phase === 'waiting' ? (
           state.started ? (
-            <p className="text-sm text-emerald-50/80">Waiting for more players…</p>
+            <p className="text-sm text-emerald-50/80">{players.length === 1 && !state.queue.length ? `${players[0].name} wins the match!` : 'Waiting for more players…'}</p>
           ) : (
             <div className="rise-in flex flex-col items-center gap-2">
               {invite}

@@ -181,7 +181,7 @@ Things phones do differently:
   5 (Fast), 10 (Standard) or 20 (Slow) hands. **Custom** lets you type your own levels, e.g.
   `10/20, 25/50, 50/100`, and how many hands each level lasts.
 - **Join a room:** enter your name and the 6-character room code, or open an invite link.
-- **Start:** the host can start alone against one automatic bot, add more bots, or play with friends. Bots rebuy when they run out of chips.
+- **Start:** the host can start alone against one automatic bot, add more bots, or play with friends. Busted bots leave permanently; the match stops when one seat remains.
 - **Watching:** spectators see live hand-win chances beside the seats; the TOURNAMENT display also shows them in its leaderboard. Before the river these are estimates from 240 random runouts, with ties split. The completed board is exact. Players never see opponents' live odds.
 - **Your turn:** you have 30 seconds, shown as a countdown and a draining bar on your name card
   (everyone can see whose turn it is). If time runs out you check when you can, otherwise you fold.

@@ -8,7 +8,7 @@ Poker, blackjack and roulette you play with friends in the browser. Free, fake c
 
 | Game | Players | You play against | Link |
 |---|---|---|---|
-| Texas Hold'em | 2 to 10 | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
+| Texas Hold'em | 1 to 10, with bots | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
 | Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
 | Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
 
@@ -27,7 +27,7 @@ Type **TOURNAMENT** as the display name when creating or joining a room. That br
 
 Poker spectators and the TOURNAMENT display also see each active hand's **win chance**. Before the river, it is estimated from random runouts; on the completed board, it is exact. Ties split the chance. The display keeps the separate **past hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
 
-This is a display for one game room. The usual game rules still apply; it does not run brackets, cross-room scores, or elimination rules. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
+Blackjack spectators see the estimated chance a player's current hands return a net profit if stood now. Roulette spectators see the exact chance their current bets return a net profit across 37 pockets. In a bot match, a bot that cannot afford the minimum leaves, and the last funded seat wins; a solo blackjack or roulette room without bots still runs normal rounds. This display does not run brackets or cross-room scores. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
 
 ## What if...
 

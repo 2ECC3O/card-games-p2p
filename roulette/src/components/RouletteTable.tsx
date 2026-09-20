@@ -1,6 +1,7 @@
 import { WifiSlashIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BET_MS, OUTSIDE, payoutMultiple, RED, SPIN_MS, staked, WHEEL } from '../engine/rouletteEngine';
+import { profitChance } from '../engine/odds';
 import type { GameState, Spot } from '../types/roulette';
 
 interface Props {
@@ -265,6 +266,7 @@ export function useLanded(state: GameState) {
 export default function RouletteTable({ state, heroId, invite, canBet, onPlace }: Props) {
   const upright = useMedia('(orientation: portrait)'); // portrait screens: the board stands upright, the wheel at its top
   const landed = useLanded(state);
+  const chances = state.spectators.some((w) => w.id === heroId) ? profitChance(state, landed) : {};
   const settled = state.phase === 'settled';
   // On a short screen the board can push the wheel out of view; bring it back for the spin.
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -288,7 +290,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
       <p className="text-base font-semibold sm:text-lg">{state.result === 0 ? 'Zero' : `${colorOf(state.result)} ${state.result}`}</p>
     </div>
   ) : (
-    <p className="text-sm text-slate-300">Waiting for players…</p>
+    <p className="text-sm text-slate-300">{state.botMatch && state.players.length === 1 && !state.queue.length ? `${state.players[0].name} wins the match!` : 'Waiting for players…'}</p>
   );
 
   const players = (
@@ -318,6 +320,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
             {/* The payout is already in the chips; hold it back until the wheel stops. */}
             <span className="font-mono font-semibold text-slate-50">{settled && !landed ? p.chips - p.payout : p.chips}</span>
             {note && <span className={won ? 'text-red-200' : 'text-slate-400'}>{note}</span>}
+            {chances[p.id] !== undefined && <span className="text-red-100" title="Chance this round's bets return a net profit">Win {Math.round(chances[p.id] * 100)}%</span>}
           </li>
         );
       })}

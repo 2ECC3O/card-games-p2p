@@ -14,7 +14,7 @@ Works on phones, tablets and desktop browsers. Part of [Card Games P2P](../READM
 3. **To invite friends:** share the room code, invite link or QR code (on the table before the game starts,
    and behind the room code button at the top left afterwards).
 4. **Friends** open the link, enter their name and press **Join**. They can be anywhere.
-5. The room creator presses **Start**. You can also play alone.
+5. The room creator presses **Start**. You can play alone, or press **Add bot** to play a last-seat-standing match.
 
 Keep the page open while you play: the game runs in the players' browsers.
 
@@ -41,6 +41,8 @@ the [Hold'em README](../poker/README.md).
 - **Payouts:** a single number pays 35 to 1, a dozen or a column 2 to 1, and red/black, odd/even and
   1-18/19-36 pay 1 to 1. Zero loses every bet except a bet on zero.
 - **Out of chips:** press **Rejoin** to come back with a fresh stack at the next round.
+- **Bots:** the host can add bots before or during play. They bet the minimum on red or black. A bot that cannot afford the minimum leaves permanently. A bot match stops when only one funded seat remains.
+- **Watching:** spectators and the TOURNAMENT display see each player's exact chance of net profit on the current bets across all 37 pockets.
 
 Splits, streets, corners and lines (bets on the lines between numbers) aren't offered.
 

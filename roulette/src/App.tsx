@@ -6,7 +6,7 @@ import InviteCard from './components/InviteCard';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import type { GameState, Spot, TableConfig } from './types/roulette';
-import { createGame, isBroke } from './engine/rouletteEngine';
+import { createGame, isBroke, MAX_SEATS } from './engine/rouletteEngine';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
@@ -381,10 +381,11 @@ export default function App() {
         {myBet ? (
           <BetControls state={game} heroId={net.me.id} chip={chip} onChip={setChip} onAction={(a) => net.act(a)} />
         ) : isHost && !game.started ? (
-          <div className="mx-auto max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
-            <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 w-full text-base sm:min-h-14 sm:text-lg`}>
+          <div className="mx-auto flex max-w-2xl gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 flex-1 text-base sm:min-h-14 sm:text-lg`}>
               {seated === 0 ? 'Waiting for players' : seated === 1 && !watching ? 'Start playing alone' : `Start game with ${seated} player${seated === 1 ? '' : 's'}`}
             </button>
+            <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-12 px-3 text-sm`}>Add bot</button>
           </div>
         ) : watching ? (
           <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
@@ -430,7 +431,10 @@ export default function App() {
 
           {isHost && (
             <div className="mt-5 border-t border-white/10 pt-4">
-              <h2 className="mb-2 text-sm font-medium text-slate-300">Players</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-slate-300">Players</h2>
+                <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-9 px-3 text-xs`}>Add bot</button>
+              </div>
               <ul className="max-h-56 space-y-1 overflow-y-auto">
                 {[
                   ...game.players.map((p) => ({ id: p.id, name: p.name, place: `Seat ${p.seat + 1}` })),

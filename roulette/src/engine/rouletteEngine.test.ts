@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {
-  addPlayer, addSpectator, applyAction, BET_MS, createGame, hostTick, isBroke, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, startGame, WHEEL,
+  addBot, addPlayer, addSpectator, applyAction, BET_MS, createGame, hostTick, isBroke, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, staked, startGame, WHEEL,
 } from './rouletteEngine';
+import { profitChance } from './odds';
 import type { GameState, PlayerAction, Spot } from '../types/roulette';
 
 // ------------------------------------------------ the wheel
@@ -46,6 +47,24 @@ function table(n: number): GameState {
 const act = (s: GameState, id: string, a: PlayerAction) => applyAction(s, id, a, 1);
 const bet = (s: GameState, id: string, spot: Spot, amount: number) => act(s, id, { type: 'bet', spot, amount });
 const player = (s: GameState, id: string) => s.players.find((p) => p.id === id)!;
+
+// Bot bets once, exact odds count 37 pockets, and an eliminated bot cannot return.
+{
+  let match = addBot(addPlayer(createGame('BOT001', config, 0), 'human', 'Human', 0), 0);
+  assert.equal(addPlayer(match, 'bot:8', 'Fake bot', 1), match);
+  match = startGame(match, 0);
+  match = hostTick(match, 1001);
+  assert.equal(staked(player(match, 'bot:1').bets), config.minBet);
+  assert.equal(player(match, 'bot:1').done, true);
+  match = bet(match, 'human', 'red', config.minBet);
+  assert.equal(profitChance(match).human, 18 / 37);
+  match = act(match, 'human', { type: 'done' });
+  player(match, 'bot:1').chips = 0;
+  match = hostTick(match, match.nextRoundAt! + 1);
+  assert.deepEqual(match.players.map((p) => p.id), ['human']);
+  assert.equal(match.phase, 'waiting');
+  assert.equal(hostTick(match, 100000), match);
+}
 
 let s = table(2);
 assert.equal(s.phase, 'betting');

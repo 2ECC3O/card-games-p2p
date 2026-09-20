@@ -1,6 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
 import {
-  addPlayer, addSpectator, applyAction, BET_MS, cleanName, hostTick, IDLE_MS, rejoinQueue, removePlayer, setConnected, startGame,
+  addBot, addPlayer, addSpectator, applyAction, BET_MS, cleanName, hostTick, IDLE_MS, isBot, rejoinQueue, removePlayer, setConnected, startGame,
 } from '../engine/rouletteEngine';
 import type { GameState, PlayerAction } from '../types/roulette';
 import { decode, encode } from './codec';
@@ -8,7 +8,7 @@ import { iceServers } from './iceServers';
 import { sha256 } from './sha256';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
-const PREFIX = 'p2p-roulette-v2-';
+const PREFIX = 'p2p-roulette-v3-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -155,6 +155,12 @@ export class TableNet {
   startGame() {
     if (this.role !== 'host' || !this.state) return;
     this.state = startGame(this.state, Date.now());
+    this.broadcast();
+  }
+
+  addBot() {
+    if (this.role !== 'host' || !this.state) return;
+    this.state = addBot(this.state, Date.now());
     this.broadcast();
   }
 
@@ -443,7 +449,7 @@ export class TableNet {
     }
     if (msg.t === 'hello') {
       const name = cleanName(msg.name);
-      if (!str(msg.id, 64) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
+      if (!str(msg.id, 64) || isBot(msg.id) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
       let m = this.members.get(msg.id);
       const reject = (message: string) => {
         this.send(conn, { t: 'reject', message });

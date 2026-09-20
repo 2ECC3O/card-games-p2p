@@ -13,6 +13,7 @@ export interface Leader {
   /** Everything the player has, including chips riding on the current round. */
   chips: number;
   connected: boolean;
+  chance?: number;
   /** Optional marker colour (roulette's player colours). */
   color?: string;
 }
@@ -77,6 +78,7 @@ export default function TournamentPanel({ code, url, leaders, startingStack, fee
                   {p.color && <span className="size-3 shrink-0 rounded-full ring-1 ring-slate-950/80" style={{ backgroundColor: p.color }} aria-hidden />}
                   <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
                   <span className="font-mono font-semibold">{p.chips}</span>
+                  {p.chance !== undefined && <span className="text-xs text-blue-200" title="Chance of net profit if all hands stand now">Stand ~{Math.round(p.chance * 100)}%</span>}
                   <span className={`w-14 text-right font-mono text-xs xl:text-sm ${change > 0 ? 'text-emerald-300' : change < 0 ? 'text-rose-300' : 'text-slate-500'}`}>
                     {change > 0 ? `+${change}` : change < 0 ? `−${-change}` : '±0'}
                   </span>

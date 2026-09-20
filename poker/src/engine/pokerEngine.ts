@@ -202,8 +202,6 @@ export function startGame(state: GameState, now: number): GameState {
 
 /** Mutates. `deck` lets tests stack the deck (cards are dealt with pop()). */
 export function startHand(s: GameState, now: number, deck?: Card[]) {
-  // ponytail: bots rebuy automatically so a solo game can continue after one loses its stack.
-  for (const p of s.players) if (isBot(p.id) && !p.left && p.chips === 0) p.chips = s.config.startingStack;
   s.players = s.players.filter((p) => p.chips > 0 && !p.left);
   while (s.players.length < MAX_SEATS && s.queue.length) {
     const q = s.queue.shift()!;
@@ -420,7 +418,7 @@ export function botAction(s: GameState, id: string): PlayerAction {
 export function hostTick(state: GameState, now: number): GameState {
   const { phase, activeId, turnDeadline } = state;
   if (activeId && isBot(activeId) && turnDeadline !== null && now >= turnDeadline - TURN_MS + BOT_DELAY_MS && BETTING_PHASES.includes(phase)) {
-    return applyAction(state, activeId, botAction(state, activeId), now);
+    return update(state, (s) => act(s, activeId, botAction(state, activeId), now)); // bot moves do not refresh room activity
   }
   if (activeId && turnDeadline !== null && now >= turnDeadline && BETTING_PHASES.includes(phase)) {
     const move: PlayerAction = { type: legalActions(state, activeId).canCheck ? 'check' : 'fold' };

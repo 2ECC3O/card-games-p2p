@@ -23,10 +23,10 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
   return lines;
 }
 
-export default function Tournament({ state, url }: { state: GameState; url: string }) {
+export default function Tournament({ state, url, chances }: { state: GameState; url: string; chances: Record<string, number> }) {
   const feed = useTicker(state, describe);
   const leaders = state.players.map((p) => ({
-    id: p.id, name: p.name, connected: p.connected,
+    id: p.id, name: p.name, connected: p.connected, chance: chances[p.id],
     chips: p.chips + (state.phase === 'settled' ? 0 : p.hands.reduce((sum, hand) => sum + hand.bet, 0)),
   }));
   return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;

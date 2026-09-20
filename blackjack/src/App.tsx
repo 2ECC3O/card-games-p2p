@@ -6,7 +6,8 @@ import InviteCard from './components/InviteCard';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import type { GameState, TableConfig } from './types/blackjack';
-import { createGame, isBroke } from './engine/blackjackEngine';
+import { createGame, isBroke, MAX_SEATS } from './engine/blackjackEngine';
+import { standProfitChance } from './engine/odds';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
@@ -298,6 +299,7 @@ export default function App() {
   const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
   const watching = game.spectators.some((w) => w.id === net.me.id);
   const display = watching && isTournament(net.me.name);
+  const chances = watching ? standProfitChance(game) : {};
   const broke = game.started && !watching && (!me || isBroke(game, me));
   const seated = game.players.length;
   const url = joinUrl(game.roomCode);
@@ -371,9 +373,9 @@ export default function App() {
 
       <div className={`flex min-h-0 flex-1 ${display ? 'flex-col overflow-y-auto lg:flex-row lg:overflow-hidden' : ''}`}>
         <section className={`relative flex-1 px-1 sm:px-4 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink lg:py-10' : 'min-h-0'}`} aria-label="Blackjack table">
-          <BlackjackTable state={game} heroId={net.me.id} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
+          <BlackjackTable state={game} heroId={net.me.id} chances={chances} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
         </section>
-        {display && <Tournament state={game} url={url} />}
+        {display && <Tournament state={game} url={url} chances={chances} />}
       </div>
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
@@ -382,10 +384,11 @@ export default function App() {
         ) : myBet ? (
           <BetControls key={game.round} state={game} heroId={net.me.id} onAction={(a) => net.act(a)} />
         ) : isHost && !game.started ? (
-          <div className="mx-auto max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
-            <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 w-full text-base sm:min-h-14 sm:text-lg`}>
+          <div className="mx-auto flex max-w-2xl gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 flex-1 text-base sm:min-h-14 sm:text-lg`}>
               {seated === 0 ? 'Waiting for players' : seated === 1 && !watching ? 'Start playing alone' : `Start game with ${seated} player${seated === 1 ? '' : 's'}`}
             </button>
+            <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-12 px-3 text-sm`}>Add bot</button>
           </div>
         ) : watching ? (
           <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
@@ -433,7 +436,10 @@ export default function App() {
 
           {isHost && (
             <div className="mt-5 border-t border-white/10 pt-4">
-              <h2 className="mb-2 text-sm font-medium text-slate-300">Players</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-slate-300">Players</h2>
+                <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-9 px-3 text-xs`}>Add bot</button>
+              </div>
               <ul className="max-h-56 space-y-1 overflow-y-auto">
                 {[
                   ...game.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, place: `Seat ${p.seat + 1}` })),

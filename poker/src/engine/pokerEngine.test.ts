@@ -40,7 +40,8 @@ const id = (s: GameState) => s.activeId!;
   assert.equal(s.phase, 'showdown', 'bot turns do not stall a solo hand');
   s.players.find((p) => p.id === 'bot:1')!.chips = 0;
   s = hostTick(s, s.nextHandAt! + 1);
-  assert.ok((s.players.find((p) => p.id === 'bot:1')?.chips ?? 0) >= 980, 'busted bot rebuys and posts a blind');
+  assert.equal(s.players.some((p) => p.id === 'bot:1'), false, 'busted bot leaves the table');
+  assert.equal(s.phase, 'waiting', 'the match stops when one player remains');
   assert.equal(addBot(lobby(2), 1).players.length, 3);
   assert.equal(startGame(createGame('TEST01', config, 0), 1).started, false);
 }

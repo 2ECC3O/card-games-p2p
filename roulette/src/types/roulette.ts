@@ -44,6 +44,8 @@ export interface GameState {
   roomCode: string;
   config: TableConfig;
   started: boolean;
+  /** A bot match ends when only one funded seat remains. */
+  botMatch: boolean;
   phase: Phase;
   round: number;
   /** Seated players, sorted by seat. */

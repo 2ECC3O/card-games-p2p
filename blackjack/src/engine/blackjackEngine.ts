@@ -10,6 +10,8 @@ export const SETTLE_MS = 6_000;
 const REVEAL_MS = 1_000;
 const DRAW_MS = 900;
 export const IDLE_MS = 5 * 60_000;
+export const isBot = (id: string) => /^bot:\d+$/.test(id);
+const BOT_DELAY_MS = 1_000;
 /** Reshuffle once less than this share of the shoe is left. */
 const CUT = 0.25;
 
@@ -93,13 +95,14 @@ export function cleanName(name: unknown): string {
 
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
   return {
-    roomCode, config, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], dealer: [], shoe: [],
+    roomCode, config, started: false, botMatch: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], dealer: [], shoe: [],
     activeId: null, activeHand: 0, deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
 
 /** Seat before the game starts; afterwards (or when full) join the queue for the next round. */
 export function addPlayer(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (isBot(id)) return state;
   const name = cleanName(rawName);
   if (!find(state, id) && !state.queue.some((q) => q.id === id) && state.queue.length >= MAX_QUEUE && (state.started || state.players.length >= MAX_SEATS))
     return state; // table and queue full
@@ -115,6 +118,20 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
     } else {
       s.queue.push({ id, name, connected: true });
     }
+  });
+}
+
+/** Host-owned seat; queued during play and never replenished after elimination. */
+export function addBot(state: GameState, now: number): GameState {
+  if (state.players.length + state.queue.length >= MAX_SEATS) return state;
+  return update(state, (s) => {
+    const number = Math.max(0, ...[...s.players, ...s.queue].map((p) => Number(/^bot:(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1;
+    const id = `bot:${number}`;
+    const name = `Bot ${number}`;
+    s.botMatch = true;
+    if (!s.started) seat(s, id, name, s.config.startingStack, true);
+    else s.queue.push({ id, name, connected: true });
+    s.lastActionAt = now;
   });
 }
 
@@ -192,7 +209,7 @@ export function startRound(s: GameState, now: number, shoe?: Card[]) {
   }
   for (const p of s.players) p.hands = [];
   Object.assign(s, { dealer: [], activeId: null, activeHand: 0, deadline: null, nextRoundAt: null });
-  if (s.players.length === 0) {
+  if (s.players.length === 0 || (s.botMatch && s.players.length === 1 && !s.queue.length)) {
     s.phase = 'waiting';
     return;
   }
@@ -355,11 +372,24 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
 /** Host clock: close betting, auto-stand on timeout, deal the next round. Returns the same object when nothing changed. */
 export function hostTick(state: GameState, now: number): GameState {
   const { phase, activeId, deadline } = state;
+  if (phase === 'betting' && deadline !== null && now >= deadline - BET_MS + BOT_DELAY_MS) {
+    const bot = state.players.find((p) => isBot(p.id) && !p.hands.length && p.chips >= state.config.minBet);
+    if (bot) return update(state, (s) => act(s, bot.id, { type: 'bet', amount: s.config.minBet }, now));
+  }
+  if (phase === 'playing' && activeId && isBot(activeId) && deadline !== null && now >= deadline - TURN_MS + BOT_DELAY_MS) {
+    const hand = state.players.find((p) => p.id === activeId)!.hands[state.activeHand];
+    const value = handValue(hand.cards);
+    const upcard = handValue(state.dealer.slice(0, 1)).total;
+    // ponytail: a small public-card strategy; no hidden dealer card or strategy package.
+    const hit = value.soft ? value.total < 18 : value.total < 12 || (value.total < 17 && (upcard < 2 || upcard > 6));
+    return update(state, (s) => act(s, activeId, { type: hit ? 'hit' : 'stand' }, now));
+  }
   if (deadline !== null && now >= deadline) {
     if (phase === 'betting') return update(state, (s) => deal(s, now)); // timeouts don't count as activity
     if (phase === 'playing' && activeId) return update(state, (s) => act(s, activeId, { type: 'stand' }, now));
   }
-  const ready = state.players.some((p) => p.chips >= state.config.minBet && !p.left) || state.queue.length > 0;
+  const ready = (state.players.some((p) => p.chips >= state.config.minBet && !p.left) || state.queue.length > 0)
+    && (!state.botMatch || state.players.filter((p) => p.chips >= state.config.minBet && !p.left).length + state.queue.length > 1);
   if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && ready))) {
     return update(state, (s) => startRound(s, now));
   }
