@@ -341,7 +341,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
 
       {/* One table: the wheel at the zero end of the board, on a felt with a wooden rail. */}
       <div
-        className={`flex gap-3 rounded-[1.75rem] bg-[radial-gradient(ellipse_at_left,#b91c1c_0%,#7f1d1d_55%,#450a0a_100%)] p-3 shadow-[inset_0_0_40px_rgba(2,6,23,.5),0_20px_50px_-20px_rgba(2,6,23,.9)] ring-[6px] ring-amber-950 sm:gap-5 sm:p-5 ${
+        className={`table-felt flex gap-3 rounded-[1.75rem] bg-[radial-gradient(ellipse_at_left,#b91c1c_0%,#7f1d1d_55%,#450a0a_100%)] p-3 shadow-[inset_0_0_40px_rgba(2,6,23,.5),0_20px_50px_-20px_rgba(2,6,23,.9)] ring-[6px] ring-amber-950 sm:gap-5 sm:p-5 ${
           upright ? 'mx-auto w-full max-w-sm sm:max-w-lg flex-1 flex-col items-center [@media(max-height:44rem)]:gap-2 [@media(max-height:44rem)]:p-2' : 'items-center'
         }`}
       >

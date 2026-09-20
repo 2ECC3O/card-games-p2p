@@ -1,13 +1,24 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
-@import "@fontsource-variable/geist-mono";
+@import "../../room.css";
+
+
 
 /* Wide AND tall screens get the biggest table sizes; short laptop screens keep the mid sizes. */
 @custom-variant tall (@media (min-width: 64rem) and (min-height: 50rem));
 
 @theme {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+  --color-slate-950: #141c18;
+  --color-slate-900: #222e27;
+  --color-slate-800: #334138;
+  --color-slate-700: #4b584e;
+  --color-slate-500: #899384;
+  --color-slate-400: #b5bdab;
+  --color-slate-300: #cbd0bf;
+  --color-slate-200: #e1e2d4;
+  --color-slate-100: #f0edde;
+  --color-slate-50: #fffaf0;
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "Courier New", monospace;
 }
 
 html,

@@ -2,152 +2,533 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#020617" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
-    <title>Card Games P2P</title>
-    <meta name="description" content="Texas Hold'em, blackjack and roulette with friends in the browser. Virtual chips, no sign-up." />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Card Games P2P" />
-    <meta property="og:description" content="Texas Hold'em, blackjack and roulette with friends in the browser. Virtual chips, no sign-up." />
-    <meta name="twitter:card" content="summary" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap" rel="stylesheet" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f2eee4" />
+    <title>Card Games P2P — Your table is ready.</title>
+    <meta
+      name="description"
+      content="A table for your friends. Play Hold’em, blackjack and roulette in your browser. Free virtual chips, no accounts."
+    />
     <style>
       :root {
-        color-scheme: dark;
-        font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #202b25;
+        background: #f2eee4;
+        font-synthesis: none;
       }
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
-        min-height: 100dvh;
-        display: grid;
-        place-items: center;
-        padding: 2.5rem 1rem;
-        color: #f8fafc;
-        background: radial-gradient(ellipse at top, #1e293b 0%, #020617 62%) #020617;
-      }
-      main {
-        width: 100%;
-        max-width: 56rem;
-      }
-      h1 {
-        margin: 0;
-        font-size: clamp(2.25rem, 7vw, 3.75rem);
-        font-weight: 700;
-        letter-spacing: -0.025em;
-      }
-      h1 span {
-        color: #94a3b8;
-      }
-      .lead {
-        margin: 0.5rem 0 2rem;
-        max-width: 38ch;
-        color: #cbd5e1;
-        font-size: 1.05rem;
-        text-wrap: balance;
-      }
-      .games {
-        display: grid;
-        gap: 1rem;
-      }
-      @media (min-width: 40rem) {
-        .games {
-          grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-          gap: 1.5rem;
-        }
       }
       a {
-        --accent: #34d399;
-        --felt: #14532d;
+        color: inherit;
+      }
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #a03d32;
+        outline-offset: 6px;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: auto;
+        padding: 0 5vw;
+      }
+      .masthead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        min-height: 94px;
+        border-bottom: 1px solid #a5aa9b;
+      }
+      .wordmark {
+        text-transform: uppercase;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        font-size: 22px;
+        text-decoration: none;
+      }
+      .wordmark span {
+        color: #a03d32;
+        margin-right: 10px;
+      }
+      .small {
+        font:
+          11px/1.5 "Courier New",
+          monospace;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+      .masthead nav {
+        display: flex;
+        gap: 30px;
+      }
+      .masthead nav a {
+        text-decoration: none;
+        padding: 12px 0;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        align-items: center;
+        gap: 5%;
+        padding: 62px 0 58px;
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .eyebrow:before {
+        content: "";
+        width: 22px;
+        height: 2px;
+        background: #a03d32;
+      }
+      h1 {
+        font-size: clamp(58px, 7.4vw, 104px);
+        letter-spacing: -0.07em;
+        line-height: 0.95;
+        margin: 26px 0;
+        font-weight: 800;
+      }
+      h1 em {
+        font-family: Georgia, serif;
+        font-weight: 400;
+        letter-spacing: -0.065em;
+      }
+      .intro {
+        font-size: 17px;
+        line-height: 1.65;
+        max-width: 33ch;
+        color: #546057;
+      }
+      .hero-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 35px;
+        margin-top: 18px;
+        background: #245a43;
+        color: #fff9eb;
+        padding: 17px 24px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .hero-link:hover {
+        background: #183e2e;
+      }
+      .illustration {
+        position: relative;
+        height: 380px;
+        display: grid;
+        place-items: center;
+        background: #245a43;
+        border-radius: 50%;
+        isolation: isolate;
+      }
+      .illustration:before {
+        content: "";
+        position: absolute;
+        inset: 17px;
+        border: 1px solid #9bae83;
+        border-radius: 50%;
+        opacity: 0.6;
+      }
+      .playing-card {
+        position: absolute;
+        width: 160px;
+        height: 228px;
+        padding: 14px;
+        background: #fffaf0;
+        border: 1px solid #202b25;
+        border-radius: 9px;
+        box-shadow: 5px 8px 0 #142f2866;
+        font:
+          bold 30px Georgia,
+          serif;
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        padding: 1.5rem;
-        border-radius: 1rem;
-        color: inherit;
-        text-decoration: none;
-        background: radial-gradient(ellipse at top, var(--felt) 0%, rgb(15 23 42 / 0.6) 75%);
-        box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
-        transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+        justify-content: space-between;
       }
-      a.blackjack {
-        --accent: #60a5fa;
-        --felt: #1e3a8a;
+      .playing-card b {
+        align-self: center;
+        font-size: 96px;
+        line-height: 0.8;
       }
-      a.roulette {
-        --accent: #f87171;
-        --felt: #7f1d1d;
+      .playing-card i {
+        align-self: flex-end;
+        transform: rotate(180deg);
+        font-style: normal;
       }
-      a:hover {
-        transform: translateY(-2px);
-        box-shadow: inset 0 0 0 2px var(--accent);
+      .playing-card.back {
+        transform: translate(-65px, 6px) rotate(-20deg);
+        background: repeating-linear-gradient(
+          45deg,
+          #f2eee4 0 2px,
+          #a03d32 2px 7px
+        );
+        border: 9px solid #fffaf0;
       }
-      a:active {
-        transform: scale(0.98);
+      .playing-card.front {
+        transform: translate(40px, -10px) rotate(13deg);
       }
-      a:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
+      .seal {
+        position: absolute;
+        bottom: 21px;
+        left: 30px;
+        border: 2px dashed #f2eee4;
+        border-radius: 50%;
+        width: 84px;
+        height: 84px;
+        display: grid;
+        place-content: center;
+        text-align: center;
+        color: #f2eee4;
+        background: #a03d32;
+        font-size: 11px;
+        transform: rotate(-12deg);
+        line-height: 1.4;
+        font-weight: 700;
       }
-      .suit {
-        font-size: 2rem;
-        line-height: 1;
-        color: var(--accent);
+      .table-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 2px solid #202b25;
+        padding: 21px 0 15px;
       }
-      h2 {
-        margin: 0.5rem 0 0;
-        font-size: 1.5rem;
-        font-weight: 600;
-      }
-      a p {
+      .table-heading h2 {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
         margin: 0;
-        color: #cbd5e1;
       }
-      .play {
-        margin-top: 0.75rem;
-        font-weight: 600;
+      .game {
+        display: grid;
+        grid-template-columns: 45px 90px 1fr 1fr 50px;
+        gap: 20px;
+        align-items: center;
+        border-top: 1px solid #b6b9ac;
+        padding: 28px 8px;
+        text-decoration: none;
+        transition: background 0.15s;
+      }
+      .game:hover {
+        background: #e7e4d7;
+      }
+      .game .number {
+        color: #667064;
+        font:
+          12px "Courier New",
+          monospace;
+      }
+      .game .symbol {
         color: var(--accent);
+        font:
+          64px/1 Georgia,
+          serif;
+        text-align: center;
+      }
+      .game h3 {
+        font-size: 32px;
+        letter-spacing: -0.045em;
+        margin: 0 0 7px;
+      }
+      .game .meta {
+        font-size: 12px;
+        color: #586357;
+      }
+      .game .description {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #586357;
+        max-width: 30ch;
+      }
+      .game .arrow {
+        width: 44px;
+        height: 44px;
+        border: 1px solid #a6ac9c;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+      }
+      .game:hover .arrow {
+        color: #fffaf0;
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .how {
+        margin-top: 55px;
+        background: #e6e4d8;
+        padding: 32px;
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 40px;
+      }
+      .how h2 {
+        margin: 0;
+        font-size: 27px;
+        letter-spacing: -0.04em;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      .steps b {
+        font:
+          12px "Courier New",
+          monospace;
+        color: #a03d32;
+      }
+      .steps h3 {
+        font-size: 16px;
+        margin: 9px 0;
+      }
+      .steps p {
+        font-size: 13px;
+        line-height: 1.65;
+        color: #586357;
+        margin: 0;
+      }
+      .notes {
+        padding: 30px 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 12px;
+        color: #586357;
+        line-height: 1.6;
+      }
+      .notes p {
+        margin: 0;
+        max-width: 60ch;
+      }
+      footer {
+        border-top: 1px solid #a5aa9b;
+        padding: 22px 0 30px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      footer a {
+        text-underline-offset: 4px;
+      }
+      @media (max-width: 700px) {
+        .masthead {
+          min-height: 75px;
+        }
+        .masthead nav {
+          gap: 18px;
+        }
+        .masthead nav a {
+          font-size: 10px;
+        }
+        .wordmark {
+          font-size: 18px;
+        }
+        .hero {
+          grid-template-columns: 1fr;
+          gap: 32px;
+          padding: 35px 0;
+        }
+        .hero h1 {
+          font-size: 60px;
+        }
+        .illustration {
+          height: 220px;
+          width: 100%;
+          max-width: 420px;
+          justify-self: center;
+        }
+        .playing-card {
+          width: 117px;
+          height: 172px;
+          font-size: 24px;
+        }
+        .playing-card b {
+          font-size: 70px;
+        }
+        .seal {
+          width: 66px;
+          height: 66px;
+          font-size: 9px;
+        }
+        .game {
+          grid-template-columns: 24px 42px 1fr 36px;
+          gap: 10px;
+          padding: 24px 0;
+        }
+        .game .symbol {
+          font-size: 43px;
+        }
+        .game h3 {
+          font-size: 27px;
+        }
+        .game .description {
+          display: none;
+        }
+        .game .arrow {
+          width: 34px;
+          height: 34px;
+          font-size: 20px;
+        }
+        .game .meta {
+          font-size: 11px;
+        }
+        .how {
+          grid-template-columns: 1fr;
+          padding: 25px;
+          gap: 25px;
+        }
+        .steps {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .steps h3 {
+          display: inline;
+          margin-left: 10px;
+        }
+        .steps p {
+          margin-top: 6px;
+        }
+        .notes {
+          flex-direction: column;
+        }
+        .table-heading .small {
+          font-size: 9px;
+        }
+        .masthead nav a:first-child {
+          display: none;
+        }
+        footer {
+          font-size: 9px;
+        }
+        .hero-link {
+          margin-top: 10px;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
-        a {
-          transition: none;
-        }
-        a:hover,
-        a:active {
-          transform: none;
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
         }
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Card Games <span>P2P</span></h1>
-      <p class="lead">Play with friends right in the browser. Virtual chips, no sign-up.</p>
-      <div class="games">
-        <a href="poker/">
-          <span class="suit" aria-hidden="true">♠</span>
-          <h2>Hold'em</h2>
-          <p>Texas Hold'em for up to 10 players, with rising blinds.</p>
-          <span class="play">Play Hold'em →</span>
-        </a>
-        <a href="blackjack/" class="blackjack">
-          <span class="suit" aria-hidden="true">♣</span>
-          <h2>Blackjack</h2>
-          <p>Up to 7 players against the house. Blackjack pays 3 to 2.</p>
-          <span class="play">Play Blackjack →</span>
-        </a>
-        <a href="roulette/" class="roulette">
-          <span class="suit" aria-hidden="true">◉</span>
-          <h2>Roulette</h2>
-          <p>Up to 10 players around one single-zero wheel. A number pays 35 to 1.</p>
-          <span class="play">Play Roulette →</span>
-        </a>
-      </div>
-    </main>
+    <div class="wrap">
+      <header class="masthead">
+        <a class="wordmark" href="./"
+          ><span aria-hidden="true">♠</span>Card Games</a
+        >
+        <nav class="small" aria-label="Main navigation">
+          <a href="#tables">The tables</a><a href="#how">How to play ↗</a>
+        </nav>
+      </header>
+      <main>
+        <section class="hero">
+          <div>
+            <p class="small eyebrow">Good company. Virtual chips.</p>
+            <h1>Your table<br />is <em>ready.</em></h1>
+            <p class="intro">
+              The cards are here. Bring your friends.<br />Three games, one
+              link, no sign-up.
+            </p>
+            <a class="hero-link" href="#tables"
+              >Find your game <span aria-hidden="true">↓</span></a
+            >
+          </div>
+          <div class="illustration" aria-hidden="true">
+            <div class="playing-card back"></div>
+            <div class="playing-card front">
+              <span>A</span><b>♠</b><i>A</i>
+            </div>
+            <div class="seal">ALL PLAY.<br />NO MONEY.</div>
+          </div>
+        </section>
+        <section id="tables" aria-labelledby="tables-title">
+          <div class="table-heading">
+            <h2 id="tables-title">Choose your table</h2>
+            <span class="small">Open to friends, near & far</span>
+          </div>
+          <a class="game" href="poker/" style="--accent: #245a43"
+            ><span class="number">01</span
+            ><span class="symbol" aria-hidden="true">♠</span>
+            <div>
+              <h3>Hold’em</h3>
+              <span class="meta">2–10 players · Texas Hold’em</span>
+            </div>
+            <p class="description">
+              Blinds rise as the night goes on. Bring a good poker face.
+            </p>
+            <span class="arrow" aria-hidden="true">↗</span></a
+          ><a class="game" href="blackjack/" style="--accent: #285a88"
+            ><span class="number">02</span
+            ><span class="symbol" aria-hidden="true">♣</span>
+            <div>
+              <h3>Blackjack</h3>
+              <span class="meta">1–7 players · Against the house</span>
+            </div>
+            <p class="description">
+              Get close to 21. Know when to stop. Blackjack pays 3 to 2.
+            </p>
+            <span class="arrow" aria-hidden="true">↗</span></a
+          ><a class="game" href="roulette/" style="--accent: #a03d32"
+            ><span class="number">03</span
+            ><span class="symbol" aria-hidden="true">◎</span>
+            <div>
+              <h3>Roulette</h3>
+              <span class="meta">1–10 players · Single zero</span>
+            </div>
+            <p class="description">
+              A shared wheel, a little suspense. A straight-up number pays 35 to
+              1.
+            </p>
+            <span class="arrow" aria-hidden="true">↗</span></a
+          >
+        </section>
+        <section class="how" id="how">
+          <h2>A game night.<br />Without the setup.</h2>
+          <div class="steps">
+            <div>
+              <b>01</b>
+              <h3>Open a room.</h3>
+              <p>Choose a game, enter your name and create a table.</p>
+            </div>
+            <div>
+              <b>02</b>
+              <h3>Send the invite.</h3>
+              <p>Share the room link or let friends scan the QR code.</p>
+            </div>
+            <div>
+              <b>03</b>
+              <h3>Deal everyone in.</h3>
+              <p>Keep your browser open. The host starts when you’re ready.</p>
+            </div>
+          </div>
+        </section>
+        <div class="notes">
+          <p>
+            Free to play. Virtual chips only. The host’s browser runs the game,
+            so play with people you trust.
+          </p>
+          <p>Phones, tablets, laptops.<br />No download needed.</p>
+        </div>
+      </main>
+      <footer>
+        <span>Card Games / P2P</span
+        ><a href="https://github.com/2ECC3O/card-games-p2p"
+          >Rules & source ↗</a
+        >
+      </footer>
+    </div>
   </body>
 </html>

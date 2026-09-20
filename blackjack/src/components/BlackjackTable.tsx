@@ -300,7 +300,7 @@ export default function BlackjackTable({ state, heroId, invite }: Props) {
 
   return (
     <div data-table className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
-      <div className="absolute inset-x-[7%] top-[2%] bottom-[8%] rounded-t-[3rem] rounded-b-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_top,#1d4ed8_0%,#1e3a8a_80%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
+      <div className="table-felt absolute inset-x-[7%] top-[2%] bottom-[8%] rounded-t-[3rem] rounded-b-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_top,#1d4ed8_0%,#1e3a8a_80%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
 
       {/* The shoe cards are dealt from, at the dealer's left. */}
       <div data-deck aria-hidden className="absolute top-[7%] left-[78%] size-0" />

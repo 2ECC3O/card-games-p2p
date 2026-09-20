@@ -194,12 +194,13 @@ export default function App() {
 
   // ------------------------------------------------ home
   if (!net || !game) {
-    const card = 'rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/10 backdrop-blur-sm sm:p-5 lg:p-6';
+    const card = 'lobby-section';
     return (
-      <main className="min-h-dvh bg-[radial-gradient(ellipse_at_top,#7f1d1d_0%,#020617_62%)] px-4 py-10 text-slate-50 sm:px-6 md:flex md:items-center md:py-12">
-        <div className="mx-auto grid w-full max-w-md gap-4 md:max-w-4xl md:grid-cols-2 md:items-end md:gap-8 lg:max-w-5xl lg:gap-12">
+      <main className="lobby" style={{ '--accent': '#a03d32', '--felt': '#672c29' } as import('react').CSSProperties}>
+        <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 03 / Roulette</span></nav>
+        <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="mb-2">
+            <header className="lobby-intro" data-mark="◎"><p className="edition">1–10 players · Single zero</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Roulette <span className="text-red-400">P2P</span>
               </h1>
@@ -238,7 +239,7 @@ export default function App() {
               <label className={label} htmlFor="code">
                 Room code
               </label>
-              <div className="flex gap-2">
+              <div className="join-controls">
                 <input
                   id="code"
                   className={`${field} font-mono text-lg tracking-[0.3em] uppercase placeholder:font-sans placeholder:text-base placeholder:tracking-normal placeholder:normal-case`}
@@ -257,11 +258,11 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Spectators see every card.</p>
+              <p className="mt-2 text-sm text-slate-400">Watch follows the wheel and bets without taking a seat.</p>
             </form>
           </div>
 
-          <form onSubmit={createRoom} className={card} aria-busy={busy === 'create'}>
+          <form onSubmit={createRoom} className={`${card} lobby-create`} aria-busy={busy === 'create'}>
             <h2 className="mb-3 text-lg font-semibold">Create a room</h2>
             <label className={label} htmlFor="stack">
               Starting stack
@@ -281,6 +282,7 @@ export default function App() {
             </button>
           </form>
         </div>
+        <div className="lobby-foot"><span>Friends only. Virtual chips. No sign-up.</span><span>Create a room, share the link, settle in.</span></div>
       </main>
     );
   }
@@ -311,7 +313,7 @@ export default function App() {
   const place = (spot: Spot) => net.act({ type: 'bet', spot, amount: Math.min(CHIPS[chip] * game.config.minBet, me?.chips ?? 0) });
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_at_center,#1e293b_0%,#020617_75%)] text-slate-50">
+    <main className="table-room flex h-dvh flex-col overflow-hidden" style={{ '--accent': '#a03d32', '--felt': '#672c29' } as import('react').CSSProperties}>
       <header className="flex items-center gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 sm:px-5 sm:pt-3">
         <button onClick={() => inviteRef.current?.showModal()} className={`${button.quiet} min-h-10 px-3`}>
           <span className={`size-2 rounded-full ${statusColor}`} aria-hidden />

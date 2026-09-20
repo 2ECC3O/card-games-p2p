@@ -1,0 +1,348 @@
+/* Shared card-room identity. Bundled locally into each game; no asset requests. */
+:root {
+  --paper: #f2eee4;
+  --ink: #202b25;
+  --muted: #566153;
+  --line: #b9bdad;
+  --accent: #245a43;
+  --felt: #174735;
+}
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #171e1b;
+}
+.lobby {
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100dvh;
+  padding: 0 max(5vw, 20px) 40px;
+}
+.room-nav {
+  max-width: 1120px;
+  min-height: 82px;
+  margin: 0 auto 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  gap: 20px;
+}
+.room-nav a {
+  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.room-nav span {
+  font:
+    11px "Courier New",
+    monospace;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lobby-layout {
+  max-width: 1120px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
+  align-items: end;
+  gap: 60px;
+}
+.lobby-intro {
+  position: relative;
+  padding: 0 75px 20px 0;
+}
+.lobby-intro:after {
+  content: attr(data-mark);
+  position: absolute;
+  right: 0;
+  top: 8px;
+  color: var(--accent);
+  font:
+    80px/1 Georgia,
+    serif;
+}
+.lobby-intro .edition {
+  font:
+    11px "Courier New",
+    monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+.lobby h1 {
+  font-size: clamp(44px, 5.5vw, 76px);
+  line-height: 1;
+  letter-spacing: -0.065em;
+  font-weight: 800;
+  margin-bottom: 17px;
+}
+.lobby h1 span {
+  display: none;
+}
+.lobby-intro > p:last-child {
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 35ch;
+  color: var(--muted);
+}
+.lobby-section {
+  border-top: 2px solid var(--ink);
+  padding: 23px 0 0;
+  margin-top: 10px;
+}
+.lobby-section h2 {
+  font-size: 22px;
+  letter-spacing: -0.035em;
+  margin-bottom: 22px;
+  font-weight: 700;
+}
+.lobby-section h2:before {
+  content: "01 / ";
+  font:
+    12px "Courier New",
+    monospace;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+  margin-right: 10px;
+}
+.lobby-create {
+  padding: 30px;
+  background: #e6e4d8;
+  border: 1px solid var(--line);
+  border-top: 5px solid var(--accent);
+}
+.lobby-create h2:before {
+  content: "02 / ";
+}
+.room-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  color: inherit;
+}
+.room-field {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #777f70;
+  border-radius: 3px;
+  padding: 12px 13px;
+  background: #fffcf4;
+  color: var(--ink);
+  outline: none;
+  min-height: 46px;
+}
+.room-field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.room-field::placeholder {
+  color: #687062;
+}
+.room-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+  min-height: 44px;
+}
+.room-button:focus-visible,
+.room-nav a:focus-visible {
+  outline: 3px solid #c99c55;
+  outline-offset: 3px;
+}
+.room-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.room-primary {
+  background: var(--accent);
+  color: #fff9ed;
+}
+.room-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.room-secondary {
+  background: #efe9d8;
+  color: #202b25;
+  border-color: #c3bda9;
+}
+.room-secondary:hover:not(:disabled) {
+  background: #fffaf0;
+}
+.room-quiet {
+  background: #ffffff0e;
+  border-color: #ffffff30;
+  color: inherit;
+}
+.room-quiet:hover:not(:disabled) {
+  background: #ffffff20;
+}
+.room-danger {
+  background: #a03d32;
+  color: #fffaf0;
+}
+.lobby .room-quiet {
+  border-color: #9ba28f;
+  background: transparent;
+}
+.lobby .room-quiet:hover {
+  background: #dcded0;
+}
+.lobby .room-secondary {
+  background: var(--accent);
+  color: #fffaf0;
+  border-color: var(--accent);
+}
+.lobby [class*="text-slate-"] {
+  color: var(--muted);
+}
+.lobby [class*="bg-slate-"] {
+  background: #e0e0d3;
+  color: var(--ink);
+  box-shadow: none;
+}
+.lobby label:has(input[type="radio"]:checked) span {
+  background: var(--ink);
+  color: #fffaf0;
+}
+.lobby label:has(input[type="radio"]:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.lobby [role="alert"] {
+  background: #f3d9a4;
+  color: #634311;
+  border: 1px solid #b38843;
+}
+.lobby [role="note"] {
+  background: #e3e3d5;
+  color: var(--ink);
+  box-shadow: none;
+}
+.lobby-foot {
+  max-width: 1120px;
+  margin: 38px auto 0;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  font:
+    11px/1.6 "Courier New",
+    monospace;
+  color: var(--muted);
+}
+.join-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+.table-room {
+  background: #171e1b;
+  color: #f6f0df;
+}
+.table-room > header {
+  border-bottom: 1px solid #e9dfbd24;
+  background: #1d2721;
+  padding-bottom: 9px;
+}
+.table-room > footer {
+  border-top: 1px solid #e9dfbd24;
+  background: #1d2721;
+  padding-top: 10px;
+}
+.table-room .room-primary {
+  background: #e8c581;
+  color: #29261d;
+}
+.table-room dialog {
+  border: 1px solid #a38c60;
+  border-radius: 6px;
+  background: #222e27;
+}
+.table-felt {
+  background: var(--felt) !important;
+  border-color: #343629 !important;
+  box-shadow:
+    inset 0 0 0 2px #bcaa7266,
+    inset 0 0 0 12px #00000014,
+    0 6px 0 #111813 !important;
+}
+.table-room [data-table] {
+  isolation: isolate;
+}
+
+.table-room .room-label {
+  color: #d7d3c3;
+}
+@media (max-width: 767px) {
+  .room-nav {
+    min-height: 66px;
+    margin-bottom: 27px;
+  }
+  .room-nav span {
+    font-size: 9px;
+  }
+  .lobby-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    max-width: 520px;
+  }
+  .lobby h1 {
+    font-size: 51px;
+  }
+  .lobby-intro {
+    padding-bottom: 10px;
+  }
+  .lobby-intro:after {
+    font-size: 65px;
+  }
+  .lobby-create {
+    padding: 22px;
+  }
+  .lobby-foot {
+    flex-direction: column;
+    gap: 3px;
+    max-width: 520px;
+  }
+  .lobby-intro > p:last-child {
+    font-size: 15px;
+  }
+  .lobby-section h2 {
+    margin-bottom: 17px;
+  }
+  .join-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .join-controls input {
+    grid-column: 1/-1;
+  }
+  .join-controls button {
+    width: 100%;
+  }
+  .room-button {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-button {
+    transition: none;
+  }
+}

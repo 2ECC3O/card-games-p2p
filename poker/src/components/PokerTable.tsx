@@ -275,7 +275,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
 
   return (
     <div data-table className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
-      <div className="absolute inset-x-[9%] inset-y-[13%] rounded-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_center,#15803d_0%,#14532d_78%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
+      <div className="table-felt absolute inset-x-[9%] inset-y-[13%] rounded-[50%] border-8 border-amber-950 bg-[radial-gradient(ellipse_at_center,#15803d_0%,#14532d_78%)] shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
 
       {/* Where cards are dealt from. */}
       <div data-deck aria-hidden className="absolute top-1/2 left-1/2 size-0" />

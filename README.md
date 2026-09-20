@@ -81,6 +81,13 @@ Open http://localhost:5173. Use `cd blackjack` or `cd roulette` for the other ga
 
 `npm test` runs the rule and network checks. `npm run build` makes the finished site in `dist/`.
 
+### Visual design
+
+The game picker is plain HTML and CSS, with no JavaScript, downloaded fonts or image assets.
+All three games import `room.css` for the shared room setup, controls and table styling.
+Their existing card, chip and wheel animations remain in each game's stylesheet.
+Keep the green poker, blue blackjack and red roulette accents, and check layouts at 375 × 667.
+
 ### Publishing
 
 Pushing to `main` publishes the site. GitHub Actions runs the tests and build for every game, then puts the
@@ -96,7 +103,7 @@ Players on mobile data sometimes can't connect directly. An optional relay fixes
 1. Make a folder with its own Vite app. Keep `base: './'` in its Vite config, and give it `test` and
    `build` scripts.
 2. Add the folder name to the `game:` list in `deploy.yml`.
-3. Add a card for it in `index.html`.
+3. Add a game row for it in `index.html`.
 
 </details>
 
