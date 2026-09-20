@@ -6,6 +6,7 @@ import { BETTING_PHASES, type Card, type GameState, type Player } from '../types
 interface Props {
   state: GameState;
   heroId: string;
+  equity?: Record<string, number>;
   /** Shown in the middle of the table before the game starts. */
   invite: ReactNode;
 }
@@ -120,13 +121,13 @@ function SecondsLeft({ deadline }: { deadline: number }) {
 
 /** `holeDelay(i)`: when hole card i is dealt. At showdown: `revealDelay`, when these cards turn over; `resultDelay`, when the result shows. */
 function Seat({
-  p, state, isHero, holeDelay, revealDelay, resultDelay,
-}: { p: Player; state: GameState; isHero: boolean; holeDelay: (i: number) => number; revealDelay: number; resultDelay: number }) {
+  p, state, isHero, holeDelay, revealDelay, resultDelay, equity, spectating,
+}: { p: Player; state: GameState; isHero: boolean; holeDelay: (i: number) => number; revealDelay: number; resultDelay: number; equity?: number; spectating: boolean }) {
   const deadline = state.activeId === p.id && BETTING_PHASES.includes(state.phase) ? state.turnDeadline : null;
   const active = state.activeId === p.id;
   const won = state.phase === 'showdown' && state.pots.some((pot) => pot.winners.includes(p.id));
   const dimmed = p.folded || (state.phase !== 'waiting' && p.chips === 0 && !p.allIn && !won);
-  const showCards = p.hole.length > 0 && !(p.folded && !isHero);
+  const showCards = p.hole.length > 0 && !(p.folded && !isHero && !spectating);
   return (
     <div className={`flex flex-col items-center transition-opacity duration-300 ${dimmed ? 'opacity-45' : ''}`}>
       {showCards && (
@@ -169,6 +170,7 @@ function Seat({
           <span className="truncate">{isHero ? 'You' : p.name}</span>
         </div>
         <div className="font-mono text-sm font-semibold text-slate-50 tall:text-base">{p.chips}</div>
+        {equity !== undefined && <div className="font-mono text-[11px] font-semibold text-amber-200" title="Chance of winning this hand; ties split the chance">Win {state.board.length === 5 || state.phase === 'showdown' ? '' : '~'}{Math.round(equity * 100)}%</div>}
         {deadline ? (
           <SecondsLeft key={`secs-${deadline}`} deadline={deadline} />
         ) : (
@@ -210,7 +212,7 @@ const travel = (dx: number, dy: number, delayMs = 0) => ({ '--dx': dx, '--dy': d
 const betPoint = ({ x, y, side }: ReturnType<typeof seatPoint>) => (side ? { x: x * 0.45, y } : { x: x * 0.55, y: y * 0.55 });
 const POT_DROP = 7; // the pot pills hang just below the board, in % of the table height
 
-export default function PokerTable({ state, heroId, invite }: Props) {
+export default function PokerTable({ state, heroId, invite, equity }: Props) {
   // Board cards already on screen. Cards that arrive together (the flop, or an all-in runout) deal in one after another.
   const shownCards = useRef(0);
   useEffect(() => {
@@ -370,7 +372,7 @@ export default function PokerTable({ state, heroId, invite }: Props) {
               // The bottom seat hangs from the table's bottom edge, so it never covers the action bar or footer text.
               style={i === 0 ? { left: '50%', top: '100%' } : at(point, 1)}
             >
-              <Seat p={p} state={state} isHero={p.id === heroId} holeDelay={holeDelay(p.id)} revealDelay={reveal.get(p.id) ?? 0} resultDelay={resultAt} />
+              <Seat p={p} state={state} isHero={p.id === heroId} holeDelay={holeDelay(p.id)} revealDelay={reveal.get(p.id) ?? 0} resultDelay={resultAt} equity={equity?.[p.id]} spectating={equity !== undefined} />
             </div>
             {p.bet > 0 && (
               // Re-keyed on every change, so each blind, call or raise tosses chips out from the seat again.

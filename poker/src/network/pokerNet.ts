@@ -1,6 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
 import {
-  addPlayer, addSpectator, applyAction, cleanName, hostTick, IDLE_MS, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
+  addBot, addPlayer, addSpectator, applyAction, cleanName, hostTick, IDLE_MS, isBot, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
 } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
 import { decode, encode } from './codec';
@@ -12,7 +12,8 @@ import { sha256 } from './sha256';
 // v3: secret fingerprints in snapshots, 'closed' message, host can remove players.
 // v4: spectators (hello carries 'watch').
 // v5: completed-hand win counts travel with player state.
-const PREFIX = 'p2p-holdem-v5-';
+// v6: host-owned bot seats and actions.
+const PREFIX = 'p2p-holdem-v6-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -158,6 +159,12 @@ export class PokerNet {
   startGame() {
     if (this.role !== 'host' || !this.state) return;
     this.state = startGame(this.state, Date.now());
+    this.broadcast();
+  }
+
+  addBot() {
+    if (this.role !== 'host' || !this.state) return;
+    this.state = addBot(this.state, Date.now());
     this.broadcast();
   }
 
@@ -446,7 +453,7 @@ export class PokerNet {
     }
     if (msg.t === 'hello') {
       const name = cleanName(msg.name);
-      if (!str(msg.id, 64) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
+      if (!str(msg.id, 64) || isBot(msg.id) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
       let m = this.members.get(msg.id);
       const reject = (message: string) => {
         this.send(conn, { t: 'reject', message });

@@ -25,7 +25,7 @@ Your friends don't need to be on your Wi-Fi. They can join from anywhere, mobile
 
 Type **TOURNAMENT** as the display name when creating or joining a room. That browser hosts or watches without taking a seat and shows the table beside a live chip leaderboard, action feed, and invite QR code. On a phone, scroll below the table for the display panel.
 
-Poker also shows each seated player's **hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
+Poker spectators and the TOURNAMENT display also see each active hand's **win chance**. Before the river, it is estimated from random runouts; on the completed board, it is exact. Ties split the chance. The display keeps the separate **past hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
 
 This is a display for one game room. The usual game rules still apply; it does not run brackets, cross-room scores, or elimination rules. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
 

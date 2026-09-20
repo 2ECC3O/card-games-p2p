@@ -18,13 +18,14 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
   return lines;
 }
 
-/** A spectator display for one table; win rate counts completed hands, including ties as wins. */
-export default function Tournament({ state, url }: { state: GameState; url: string }) {
+/** A spectator display for one table; history counts completed hands, including ties as wins. */
+export default function Tournament({ state, url, equity }: { state: GameState; url: string; equity: Record<string, number> }) {
   const feed = useTicker(state, describe);
   const leaders = state.players.map((p) => ({
     id: p.id, name: p.name, connected: p.connected,
     chips: p.chips + (state.phase === 'showdown' ? 0 : p.committed),
     handsPlayed: p.handsPlayed, handsWon: p.handsWon,
+    equity: equity[p.id], exact: state.board.length === 5 || state.phase === 'showdown',
   }));
   return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;
 }

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import pokersolver from 'pokersolver';
 import type { Card, GameState } from '../types/poker';
+import { handEquity } from './equity';
 import {
-  addPlayer, addSpectator, applyAction, buildPots, cleanName, createGame, hostTick, legalActions, maskFor, MAX_QUEUE, MAX_SEATS,
+  addBot, addPlayer, addSpectator, applyAction, buildPots, cleanName, createGame, hostTick, legalActions, maskFor, MAX_QUEUE, MAX_SEATS,
   rejoinQueue, removePlayer, startGame, startHand, TURN_MS,
 } from './pokerEngine';
 
@@ -24,6 +25,36 @@ function dealt(stacks: number[]) {
   return s;
 }
 const id = (s: GameState) => s.activeId!;
+
+// A single human starts against an automatically seated bot; extra bots take ordinary seats and act on host ticks.
+{
+  let s = startGame(lobby(1), 0);
+  assert.equal(s.players.length, 2);
+  assert.equal(s.players[1].id, 'bot:1');
+  assert.equal(s.phase, 'preflop');
+  for (let step = 0; step < 90 && s.phase !== 'showdown'; step++) {
+    const who = id(s);
+    if (who.startsWith('bot:')) s = hostTick(s, step * 500);
+    else s = applyAction(s, who, legalActions(s, who).canCheck ? { type: 'check' } : { type: 'call' }, step * 500);
+  }
+  assert.equal(s.phase, 'showdown', 'bot turns do not stall a solo hand');
+  s.players.find((p) => p.id === 'bot:1')!.chips = 0;
+  s = hostTick(s, s.nextHandAt! + 1);
+  assert.ok((s.players.find((p) => p.id === 'bot:1')?.chips ?? 0) >= 980, 'busted bot rebuys and posts a blind');
+  assert.equal(addBot(lobby(2), 1).players.length, 3);
+  assert.equal(startGame(createGame('TEST01', config, 0), 1).started, false);
+}
+
+// Live odds are exact on a complete board, divide ties, and estimate only missing cards.
+{
+  const players = [{ id: 'a', hole: ['As', 'Ah'] as Card[] }, { id: 'b', hole: ['Ks', 'Kh'] as Card[] }];
+  assert.deepEqual(handEquity(players, ['2c', '3d', '4h', '8s', '9c']), { a: 1, b: 0 });
+  assert.deepEqual(handEquity(players, ['2c', '3d', '4h', '5s', '6c']), { a: 0.5, b: 0.5 });
+  const odds = handEquity(players, [], 300);
+  assert.deepEqual(handEquity(players, [], 300), odds, 'different spectator tabs get the same estimate');
+  assert.ok(odds.a > 0.6 && odds.a < 0.95, `aces should be favoured: ${odds.a}`);
+  assert.ok(Math.abs(odds.a + odds.b - 1) < 0.001);
+}
 
 // Heads-up: the dealer posts the small blind and acts first; the big blind keeps the option.
 {

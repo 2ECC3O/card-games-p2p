@@ -17,6 +17,8 @@ export interface Leader {
   color?: string;
   handsPlayed: number;
   handsWon: number;
+  equity?: number;
+  exact?: boolean;
 }
 
 interface Entry {
@@ -66,7 +68,7 @@ export default function TournamentPanel({ code, url, leaders, startingStack, fee
       </div>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Chip counts · Hand win rate</h2>
+        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Chip counts · Live win chance</h2>
         {ranked.length === 0 ? (
           <p className="text-sm text-slate-400">Nobody seated yet.</p>
         ) : (
@@ -80,9 +82,10 @@ export default function TournamentPanel({ code, url, leaders, startingStack, fee
                   <span className="min-w-0 flex-1 font-medium">
                     <span className="block truncate">{p.name}</span>
                     <span className="block text-xs font-normal text-slate-400" title="Completed hands won, including ties, divided by completed hands dealt">
-                      {p.handsPlayed ? `${Math.round((100 * p.handsWon) / p.handsPlayed)}% · ${p.handsWon}/${p.handsPlayed} hands` : 'No completed hands'}
+                      {p.handsPlayed ? `${Math.round((100 * p.handsWon) / p.handsPlayed)}% · ${p.handsWon}/${p.handsPlayed} past hands` : 'No past hands'}
                     </span>
                   </span>
+                  {p.equity !== undefined && <span className="font-mono text-xs font-semibold text-amber-200" title="Chance of winning this hand; ties split the chance">{p.exact ? '' : '~'}{Math.round(p.equity * 100)}%</span>}
                   <span className="font-mono font-semibold">{p.chips}</span>
                   <span className={`w-14 text-right font-mono text-xs xl:text-sm ${change > 0 ? 'text-emerald-300' : change < 0 ? 'text-rose-300' : 'text-slate-500'}`}>
                     {change > 0 ? `+${change}` : change < 0 ? `−${-change}` : '±0'}

@@ -25,7 +25,7 @@ There are two ways to use it:
    table before the game starts, and behind the room code button at the top left afterwards.
 4. **Your friends** open the link (or the page, then type the code), enter their name and press **Join**.
    They can be anywhere: same Wi-Fi, another house, or on mobile data.
-5. When at least 2 players are in, the room creator presses **Start game**.
+5. Press **Start vs Bot** to play alone, or **Add bot** to fill more seats. With friends, press **Start game** when ready.
 
 Keep the page open while you play. The game runs in the players' browsers, so if everyone closes the page,
 the room ends. See [How to play](#how-to-play) for the rules and controls.
@@ -181,7 +181,8 @@ Things phones do differently:
   5 (Fast), 10 (Standard) or 20 (Slow) hands. **Custom** lets you type your own levels, e.g.
   `10/20, 25/50, 50/100`, and how many hands each level lasts.
 - **Join a room:** enter your name and the 6-character room code, or open an invite link.
-- **Start:** the host presses **Start game** once at least 2 players are seated.
+- **Start:** the host can start alone against one automatic bot, add more bots, or play with friends. Bots rebuy when they run out of chips.
+- **Watching:** spectators see live hand-win chances beside the seats; the TOURNAMENT display also shows them in its leaderboard. Before the river these are estimates from 240 random runouts, with ties split. The completed board is exact. Players never see opponents' live odds.
 - **Your turn:** you have 30 seconds, shown as a countdown and a draining bar on your name card
   (everyone can see whose turn it is). If time runs out you check when you can, otherwise you fold.
   A short chime plays when the action reaches you; the speaker button in the header mutes it.

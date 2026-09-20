@@ -1,4 +1,5 @@
 import pokersolver from 'pokersolver';
+import { handEquity } from './equity';
 import {
   BETTING_PHASES,
   type Card,
@@ -12,8 +13,10 @@ import {
 const { Hand } = pokersolver; // CommonJS package: default import works in Vite and tsx
 
 export const MAX_SEATS = 10;
+export const isBot = (id: string) => /^bot:\d+$/.test(id);
 export const MAX_QUEUE = 20;
 export const TURN_MS = 30_000;
+const BOT_DELAY_MS = 1_000;
 export const SHOWDOWN_MS = 6_000;
 /** Extra showdown time while the table turns cards over (per player) and deals an all-in runout (per card). */
 const REVEAL_MS = 500;
@@ -102,6 +105,7 @@ export function createGame(roomCode: string, config: TableConfig, now: number): 
 
 /** Seat before the game starts; afterwards (or when full) join the queue for the next hand. */
 export function addPlayer(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (isBot(id)) return state; // bot seats belong to the host, not remote peers
   const name = cleanName(rawName);
   if (!find(state, id) && !state.queue.some((q) => q.id === id) && state.queue.length >= MAX_QUEUE && (state.started || state.players.length >= MAX_SEATS))
     return state; // table and queue full
@@ -117,6 +121,20 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
     } else {
       s.queue.push({ id, name, connected: true });
     }
+  });
+}
+
+/** Host-owned seat; added now or queued for the next hand. */
+export function addBot(state: GameState, now: number): GameState {
+  if (state.players.length + state.queue.length >= MAX_SEATS) return state;
+  return update(state, (s) => {
+    const numbers = [...s.players, ...s.queue].map((p) => /^bot:(\d+)$/.exec(p.id)).filter((m) => m !== null).map((m) => Number(m[1]));
+    const number = Math.max(0, ...numbers) + 1;
+    const id = `bot:${number}`;
+    const name = `Bot ${number}`;
+    if (!s.started && s.players.length < MAX_SEATS) seat(s, id, name, s.config.startingStack, true);
+    else s.queue.push({ id, name, connected: true });
+    s.lastActionAt = now;
   });
 }
 
@@ -172,8 +190,8 @@ export function addSpectator(state: GameState, id: string, rawName: string, now:
 }
 
 export function startGame(state: GameState, now: number): GameState {
-  if (state.started || state.players.length < 2) return state;
-  return update(state, (s) => {
+  if (state.started || !state.players.length) return state;
+  return update(state.players.length === 1 ? addBot(state, now) : state, (s) => {
     s.started = true;
     s.lastActionAt = now;
     startHand(s, now);
@@ -184,6 +202,8 @@ export function startGame(state: GameState, now: number): GameState {
 
 /** Mutates. `deck` lets tests stack the deck (cards are dealt with pop()). */
 export function startHand(s: GameState, now: number, deck?: Card[]) {
+  // ponytail: bots rebuy automatically so a solo game can continue after one loses its stack.
+  for (const p of s.players) if (isBot(p.id) && !p.left && p.chips === 0) p.chips = s.config.startingStack;
   s.players = s.players.filter((p) => p.chips > 0 && !p.left);
   while (s.players.length < MAX_SEATS && s.queue.length) {
     const q = s.queue.shift()!;
@@ -380,9 +400,28 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
   });
 }
 
+/** The bot uses only its own cards and the public board; opponents' hidden cards never inform its move. */
+export function botAction(s: GameState, id: string): PlayerAction {
+  const p = find(s, id)!;
+  const legal = legalActions(s, id);
+  const opponents = s.players.filter((other) => other.id !== id && !other.folded);
+  const equity = handEquity([{ id, hole: p.hole }, ...opponents.map((other) => ({ id: other.id, hole: ['??', '??'] as Card[] }))], s.board, 80)[id] ?? 0;
+  const pot = s.players.reduce((sum, player) => sum + player.committed, 0);
+  const potOdds = legal.callAmount / (pot + legal.callAmount || 1);
+  if (legal.canRaise && equity > 0.66 && Math.random() < 0.55) {
+    const amount = Math.min(legal.maxRaiseTo, Math.max(legal.minRaiseTo, s.currentBet + Math.max(s.blinds.big * 2, Math.floor(pot / 2))));
+    return { type: 'raise', amount };
+  }
+  if (legal.canCheck) return { type: 'check' };
+  return equity + 0.06 >= Math.max(0.25, potOdds) ? { type: 'call' } : { type: 'fold' };
+}
+
 /** Host clock: auto check/fold on timeout, deal the next hand. Returns the same object when nothing changed. */
 export function hostTick(state: GameState, now: number): GameState {
   const { phase, activeId, turnDeadline } = state;
+  if (activeId && isBot(activeId) && turnDeadline !== null && now >= turnDeadline - TURN_MS + BOT_DELAY_MS && BETTING_PHASES.includes(phase)) {
+    return applyAction(state, activeId, botAction(state, activeId), now);
+  }
   if (activeId && turnDeadline !== null && now >= turnDeadline && BETTING_PHASES.includes(phase)) {
     const move: PlayerAction = { type: legalActions(state, activeId).canCheck ? 'check' : 'fold' };
     return update(state, (s) => act(s, activeId, move, now)); // timeouts don't count as activity

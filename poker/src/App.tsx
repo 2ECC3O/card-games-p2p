@@ -1,12 +1,13 @@
 import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ActionControls from './components/ActionControls';
 import InviteCard from './components/InviteCard';
 import PokerTable from './components/PokerTable';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import { BETTING_PHASES, type BlindLevel, type GameState, type TableConfig } from './types/poker';
-import { createGame } from './engine/pokerEngine';
+import { createGame, MAX_SEATS } from './engine/pokerEngine';
+import { handEquity } from './engine/equity';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { PokerNet, randomRoomCode, type Identity, type NetStatus } from './network/pokerNet';
@@ -179,6 +180,16 @@ export default function App() {
 
   // Chime once per turn when the action reaches us.
   const myTurn = !!game && !!net && game.activeId === net.me.id && BETTING_PHASES.includes(game.phase);
+  const watchingNow = !!game && !!net && game.spectators.some((w) => w.id === net.me.id);
+  const oddsKey = watchingNow && game && game.handNumber && game.phase !== 'waiting'
+    ? JSON.stringify([game.roomCode, game.handNumber, game.board, game.players.map((p) => [p.id, p.hole, p.folded])]) : '';
+  const equity = useMemo(() => {
+    if (!oddsKey || !game) return {};
+    const live = game.players.filter((p) => !p.folded && p.hole.length === 2);
+    return handEquity(live, game.board, 240, game.players.filter((p) => p.folded).flatMap((p) => p.hole));
+    // The key includes every card and fold that can change the calculation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oddsKey]);
   const turnKey = myTurn ? `${game!.handNumber}-${game!.phase}-${game!.turnDeadline}` : null;
   useEffect(() => {
     if (turnKey && !muted) chime();
@@ -207,7 +218,7 @@ export default function App() {
         <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 01 / Hold’em</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="♠"><p className="edition">2–10 players · Texas Hold’em</p>
+            <header className="lobby-intro" data-mark="♠"><p className="edition">Solo or 2–10 players · Texas Hold’em</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Hold'em <span className="text-emerald-400">P2P</span>
               </h1>
@@ -403,20 +414,22 @@ export default function App() {
           <PokerTable
             state={game}
             heroId={net.me.id}
+            equity={watching ? equity : undefined}
             invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />}
           />
         </section>
-        {display && <Tournament state={game} url={url} />}
+        {display && <Tournament state={game} url={url} equity={equity} />}
       </div>
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
         {myTurn ? (
           <ActionControls key={`${game.handNumber}-${game.phase}-${game.turnDeadline}`} state={game} heroId={net.me.id} onAction={(action) => net.act(action)} />
         ) : isHost && !game.started ? (
-          <div className="mx-auto max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
-            <button disabled={seated < 2} onClick={() => net.startGame()} className={`${button.primary} min-h-12 w-full text-base sm:min-h-14 sm:text-lg`}>
-              {seated < 2 ? 'Waiting for a second player' : `Start game with ${seated} players`}
+          <div className="mx-auto flex max-w-2xl gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 flex-1 text-base sm:min-h-14 sm:text-lg`}>
+              {seated === 0 ? 'Waiting for a player' : seated === 1 ? (me ? 'Start vs Bot' : 'Start bot game') : `Start game with ${seated} players`}
             </button>
+            <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-12 px-3 text-sm`}>Add bot</button>
           </div>
         ) : watching ? (
           <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
@@ -462,7 +475,10 @@ export default function App() {
 
           {isHost && (
             <div className="mt-5 border-t border-white/10 pt-4">
-              <h2 className="mb-2 text-sm font-medium text-slate-300">Players</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-slate-300">Players</h2>
+                <button disabled={game.players.length + game.queue.length >= MAX_SEATS} onClick={() => net.addBot()} className={`${button.quiet} min-h-9 px-3 text-xs`}>Add bot</button>
+              </div>
               <ul className="max-h-56 space-y-1 overflow-y-auto">
                 {[
                   ...game.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, place: `Seat ${p.seat + 1}` })),
