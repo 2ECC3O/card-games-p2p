@@ -1,6 +1,6 @@
 # Card Games P2P
 
-Poker, blackjack and roulette you play with friends in the browser. Free, fake chips, no sign-up.
+Poker, blackjack, roulette and eight-ball pool you play with friends in the browser. Free, no sign-up.
 
 **Play now: https://2ecc3o.github.io/card-games-p2p/**
 
@@ -11,6 +11,7 @@ Poker, blackjack and roulette you play with friends in the browser. Free, fake c
 | Texas Hold'em | 1 to 10, with bots | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
 | Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
 | Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
+| Eight-ball pool | 1 to 4, with bots | the other team | [play](https://2ecc3o.github.io/card-games-p2p/pool/) |
 
 ## Start a game in a minute
 
@@ -28,6 +29,8 @@ Type **TOURNAMENT** as the display name when creating or joining a room. That br
 Poker spectators and the TOURNAMENT display also see each active hand's **win chance**. Before the river, it is estimated from random runouts; on the completed board, it is exact. Ties split the chance. The display keeps the separate **past hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
 
 Blackjack spectators see the estimated chance a player's current hands return a net profit if stood now. Roulette spectators see the exact chance their current bets return a net profit across 37 pockets. In a bot match, a bot that cannot afford the minimum leaves, and the last funded seat wins; a solo blackjack or roulette room without bots still runs normal rounds. This display does not run brackets or cross-room scores. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
+
+Pool spectators see a rough live rack outlook based on cleared balls and whose turn it is. The TOURNAMENT display also shows past rack win rate. The outlook is a simple estimate, not a measured winning probability. Pool supports singles or Scotch doubles, and the host fills empty seats with lightweight bots when the match starts.
 
 ## What if...
 
@@ -55,7 +58,7 @@ Each player's browser only receives the cards that player is allowed to see. The
 whole deck, though, so play with people you trust.
 
 Each game's own README has the full rules and details:
-[Hold'em](poker/README.md) · [Blackjack](blackjack/README.md) · [Roulette](roulette/README.md)
+[Hold'em](poker/README.md) · [Blackjack](blackjack/README.md) · [Roulette](roulette/README.md) · [Pool](pool/README.md)
 
 ## For developers
 
@@ -69,11 +72,12 @@ Each game's own README has the full rules and details:
 | `poker/` | the Hold'em app (Vite + React + TypeScript) |
 | `blackjack/` | the blackjack app, same stack and design |
 | `roulette/` | the roulette app, same stack and design |
+| `pool/` | eight-ball pool, same peer-to-peer room pattern |
 | `index.html` | the game picker page at the root of the site |
 | `.github/workflows/deploy.yml` | tests, builds and publishes everything |
 
 Each game is its own app with its own `package.json`. They don't share code; blackjack started as a
-copy of Hold'em's networking and styling, and roulette as a copy of blackjack's.
+copy of Hold'em's networking and styling, roulette as a copy of blackjack's, and pool follows the same room pattern.
 
 ### Run a game on your computer
 
@@ -85,16 +89,16 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Use `cd blackjack` or `cd roulette` for the other games.
+Open http://localhost:5173. Use `cd blackjack`, `cd roulette`, or `cd pool` for the other games.
 
 `npm test` runs the rule and network checks. `npm run build` makes the finished site in `dist/`.
 
 ### Visual design
 
 The game picker is plain HTML and CSS, with no JavaScript, downloaded fonts or image assets.
-All three games import `room.css` for the shared room setup, controls and table styling.
+All four games import `room.css` for the shared room setup and controls.
 Their existing card, chip and wheel animations remain in each game's stylesheet.
-Keep the green poker, blue blackjack and red roulette accents, and check layouts at 375 × 667.
+Keep the green poker, blue blackjack, red roulette and green felt pool accents, and check layouts at 375 × 667.
 
 ### Publishing
 
