@@ -10,7 +10,7 @@ for (const text of ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(64), '
 }
 
 // A real 7-player game state survives a round trip and shrinks well below PeerJS's ~16 KB per-message ceiling.
-let s = createGame('ABC123', { startingStack: 1000, minBet: 10 }, 0);
+let s = createGame('ABC123', { startingStack: 1000, minBet: 10, mustDraw: false }, 0);
 for (let i = 0; i < 7; i++) s = addPlayer(s, `player-${i}-${'x'.repeat(10)}`, `Player ${i}`, 0);
 s = startGame(s, 0);
 const msg = { t: 'state', state: s, standbyId: 'player-1', snapshot: { state: s, members: [] } };

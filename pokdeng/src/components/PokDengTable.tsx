@@ -1,7 +1,7 @@
 import { WifiSlashIcon } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BET_MS, deng, handType, TURN_MS } from '../engine/pokDengEngine';
-import type { Card, GameState, Outcome, Player } from '../types/pokdeng';
+import type { Card, GameState, Hand, Outcome, Player } from '../types/pokdeng';
 
 interface Props {
   state: GameState;
@@ -147,22 +147,82 @@ function handLabel(cards: Card[]) {
   return `${handType(cards).name}${d > 1 ? ` · ${d} deng` : ''}`;
 }
 
-/** `dealDelay(i)`: when card i flies in. `labelDelay`: when the hand's name shows. */
-function HandView({ cards, size, round, labelDelay, dealDelay }: { cards: Card[]; size: keyof typeof SIZE; round: number; labelDelay: number; dealDelay: (i: number) => number }) {
-  const label = handLabel(cards);
+/** Where a hand was placed, when it isn't its owner's own spot. */
+const spotName = (s: GameState, h: Hand) =>
+  h.spot === 'last' ? 'Last, after the dealer' : h.spot === 'seat' ? null : `Cut in: ${s.players.find((p) => p.id === h.spot)?.name ?? 'seat'}`;
+
+/** One hand (ขา): its cards, its name once known, where it sits if it cut in, and its stake or result. */
+function HandView({ hand, state, size, active, revealDelay, labelDelay, dealDelay }: {
+  hand: Hand; state: GameState; size: keyof typeof SIZE; active: boolean; revealDelay: number; labelDelay: number; dealDelay: (card: number) => number;
+}) {
+  const label = handLabel(hand.cards);
+  const [result, tone] = hand.outcome ? OUTCOME[hand.outcome] : ['', ''];
+  const where = spotName(state, hand);
   return (
-    <div className="relative rounded-lg p-0.5">
-      <div className={`flex ${OVERLAP[size]}`}>
-        {cards.map((c, i) => (
-          // Keyed by position, so a hidden card turns over in place when it's revealed.
-          <CardView key={`${round}-${i}`} card={c} size={size} dealDelay={dealDelay(i)} flipDelay={FLIP_PAUSE} />
-        ))}
-      </div>
+    <div className="flex min-w-16 flex-col items-center gap-1">
+      {hand.cards.length > 0 && (
+        <div className={`relative rounded-lg p-0.5 transition ${active ? 'ring-2 ring-yellow-300' : ''}`}>
+          <div className={`flex ${OVERLAP[size]}`}>
+            {hand.cards.map((c, i) => (
+              // Keyed by position, so a hidden card turns over in place when it's revealed.
+              <CardView key={`${state.round}-${i}`} card={c} size={size} dealDelay={dealDelay(i)} flipDelay={FLIP_PAUSE} />
+            ))}
+          </div>
+        </div>
+      )}
       {label && (
         <span
           key={label}
           style={{ animationDelay: `${labelDelay}ms` }}
-          className="rise-in absolute -top-2 -right-3 rounded-full bg-slate-950 px-1.5 py-0.5 font-mono text-[10px] font-semibold whitespace-nowrap text-slate-50 ring-1 ring-white/20 tall:text-xs"
+          className="rise-in rounded-full bg-slate-950 px-1.5 py-0.5 font-mono text-[10px] font-semibold whitespace-nowrap text-slate-50 ring-1 ring-white/20 tall:text-xs"
+        >
+          {label}
+        </span>
+      )}
+      {where && <span className="max-w-24 truncate text-[10px] text-yellow-100/80 tall:text-xs">{where}</span>}
+      {/* The chip animations centre on their anchor, so the chip sits absolutely in a fixed-height slot. */}
+      <div className="relative h-6 w-full sm:h-7">
+        {hand.outcome ? (
+          <>
+            {hand.net < 0 && (
+              <div className="chip-lost absolute top-1/2 left-1/2" style={{ animationDelay: `${revealDelay}ms` }} aria-hidden>
+                <Chips amount={-hand.net} />
+              </div>
+            )}
+            <div
+              className={`rise-in absolute inset-x-0 top-0 mx-auto w-max rounded-full px-2.5 py-0.5 text-xs font-semibold shadow shadow-black/40 sm:text-sm ${tone}`}
+              style={{ animationDelay: `${revealDelay}ms` }}
+            >
+              {result}
+              {hand.net !== 0 && <span className="font-mono"> {hand.net > 0 ? `+${hand.net}` : `−${-hand.net}`}</span>}
+            </div>
+          </>
+        ) : (
+          <div key={`${state.round}-${hand.bet}`} className="chip-from absolute top-1/2 left-1/2" style={{ '--dx': 0, '--dy': 6 } as CSSProperties}>
+            <Chips amount={hand.bet} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The dealer's cards and, once known, their hand. */
+function DealerHand({ state, size, dealDelay, labelDelay }: { state: GameState; size: keyof typeof SIZE; dealDelay: (card: number) => number; labelDelay: number }) {
+  const label = handLabel(state.dealer);
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className={`flex ${OVERLAP[size]}`}>
+        {state.dealer.map((c, i) => (
+          // Keyed by position, so a hidden card turns over in place when it's revealed.
+          <CardView key={`${state.round}-${i}`} card={c} size={size} dealDelay={dealDelay(i)} flipDelay={FLIP_PAUSE} />
+        ))}
+      </div>
+      {label && (
+        <span
+          key={`${state.round}-${label}`}
+          className="rise-in rounded-full bg-slate-950 px-2 py-0.5 font-mono text-[10px] font-semibold whitespace-nowrap text-slate-50 ring-1 ring-white/20 sm:text-xs tall:text-sm"
+          style={{ animationDelay: `${labelDelay}ms` }}
         >
           {label}
         </span>
@@ -171,54 +231,60 @@ function HandView({ cards, size, round, labelDelay, dealDelay }: { cards: Card[]
   );
 }
 
-function Seat({ p, state, isHero, revealDelay, dealDelay, dealEnd }: { p: Player; state: GameState; isHero: boolean; revealDelay: number; dealDelay: (card: number) => number; dealEnd: number }) {
-  const active = state.activeId === p.id && state.phase === 'playing';
+function Seat({ p, state, isHero, revealDelay, dealDelay, dealEnd, dealerHand, top }: {
+  p: Player; state: GameState; isHero: boolean; revealDelay: number; dealDelay: (hand: Hand, card: number) => number; dealEnd: number;
+  /** The dealer's cards, shown at this seat when it deals. */
+  dealerHand: ReactNode;
+  /** In the top half of the table: cards go below the name, towards the middle. */
+  top: boolean;
+}) {
+  const hands = state.hands.filter((h) => h.owner === p.id);
+  const banker = state.bankerId === p.id;
+  const active = state.phase === 'playing' && state.activeId === p.id;
   const deadline = active ? state.deadline : null;
-  const betting = state.phase === 'betting' && !p.bet;
-  const satOut = (state.phase === 'playing' || state.phase === 'settled') && !p.bet;
-  const settled = p.outcome !== null;
-  const [label, tone] = settled ? OUTCOME[p.outcome!] : ['', ''];
+  const betting = state.phase === 'betting' && !banker && !p.ready;
+  const satOut = !banker && (state.phase === 'playing' || state.phase === 'settled') && !hands.length;
+  // The dealer's result is the other side of every hand.
+  const net = banker ? -state.hands.reduce((n, h) => n + h.net, 0) : hands.reduce((n, h) => n + h.net, 0);
+  const won = state.phase === 'settled' && net > 0;
   return (
-    <div className={`flex flex-col items-center transition-opacity duration-300 ${satOut || p.left ? 'opacity-45' : ''}`}>
-      {p.cards.length > 0 && (
-        <div className="mb-1.5 flex flex-col items-center gap-1">
-          <HandView cards={p.cards} size={isHero ? 'large' : 'seat'} round={state.round} labelDelay={settled ? revealDelay - 200 : dealEnd} dealDelay={dealDelay} />
-          {/* The chip animations centre on their anchor, so the chip sits absolutely in a fixed-height slot. */}
-          <div className="relative h-6 w-full sm:h-7">
-            {settled ? (
-              <>
-                {p.net < 0 && (
-                  <div className="chip-lost absolute top-1/2 left-1/2" style={{ animationDelay: `${revealDelay}ms` }} aria-hidden>
-                    <Chips amount={-p.net} />
-                  </div>
-                )}
-                <div
-                  className={`rise-in absolute inset-x-0 top-0 mx-auto w-max rounded-full px-2.5 py-0.5 text-xs font-semibold shadow shadow-black/40 sm:text-sm ${tone}`}
-                  style={{ animationDelay: `${revealDelay}ms` }}
-                >
-                  {label}
-                  {p.net !== 0 && <span className="font-mono"> {p.net > 0 ? `+${p.net}` : `−${-p.net}`}</span>}
-                </div>
-              </>
-            ) : (
-              <div key={`${state.round}-${p.bet}`} className="chip-from absolute top-1/2 left-1/2" style={{ '--dx': 0, '--dy': 6 } as CSSProperties}>
-                <Chips amount={p.bet} />
-              </div>
-            )}
-          </div>
+    <div className={`flex ${top ? 'flex-col-reverse' : 'flex-col'} items-center gap-1.5 transition-opacity duration-300 ${satOut || p.left ? 'opacity-45' : ''}`}>
+      {banker && state.dealer.length > 0 && dealerHand}
+      {hands.length > 0 && (
+        <div className="flex items-end gap-1 sm:gap-2">
+          {hands.map((h) => (
+            <HandView
+              key={h.id}
+              hand={h}
+              state={state}
+              size={isHero && hands.length === 1 ? 'large' : 'seat'}
+              active={state.activeHand === h.id && hands.length > 1}
+              revealDelay={revealDelay}
+              labelDelay={h.outcome ? revealDelay - 200 : dealEnd}
+              dealDelay={(card) => dealDelay(h, card)}
+            />
+          ))}
         </div>
       )}
       <div
         className={`relative w-18 rounded-xl px-2 py-1 text-center shadow-lg shadow-black/40 transition duration-300 sm:w-24 sm:px-2.5 tall:w-32 tall:py-1.5 ${
-          active ? 'bg-slate-900 ring-2 ring-yellow-300 shadow-yellow-400/20' : p.outcome === 'win' ? 'bg-yellow-950 ring-2 ring-yellow-400' : 'bg-slate-950/90 ring-1 ring-white/10'
+          active ? 'bg-slate-900 ring-2 ring-yellow-300 shadow-yellow-400/20' : won ? 'bg-yellow-950 ring-2 ring-yellow-400' : 'bg-slate-950/90 ring-1 ring-white/10'
         }`}
       >
+        {banker && (
+          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-yellow-300 px-2 text-[10px] font-bold tracking-wide text-yellow-950 uppercase shadow">Dealer</span>
+        )}
         {deadline && <TimerBar key={`bar-${deadline}`} deadline={deadline} total={TURN_MS} className="absolute inset-x-2 -bottom-2.5" />}
         <div className="flex items-center justify-center gap-1 truncate text-xs font-medium text-slate-200 tall:text-sm">
           {!p.connected && <WifiSlashIcon size={12} weight="bold" className="shrink-0 text-rose-300" aria-label="Disconnected" />}
           <span className="truncate">{isHero ? 'You' : p.name}</span>
         </div>
         <div className="font-mono text-sm font-semibold text-slate-50 tall:text-base">{p.chips}</div>
+        {banker && state.phase === 'settled' && net !== 0 && (
+          <div className={`rise-in font-mono text-[11px] font-semibold tall:text-xs ${net > 0 ? 'text-yellow-200' : 'text-rose-300'}`} style={{ animationDelay: `${revealDelay}ms` }}>
+            {net > 0 ? `+${net}` : `−${-net}`}
+          </div>
+        )}
         {deadline ? (
           <SecondsLeft key={`secs-${deadline}`} deadline={deadline} />
         ) : (
@@ -229,77 +295,74 @@ function Seat({ p, state, isHero, revealDelay, dealDelay, dealEnd }: { p: Player
   );
 }
 
-/**
- * Seat anchor (bottom centre of the seat) in percent of the table. Seats follow the curved edge of the table
- * from left to right, in the order they play; with many players the ends climb up the sides.
- */
+/** Seat centre, in % of the table from its middle. You sit at the bottom; the others follow clockwise round the oval. */
 function seatPoint(i: number, n: number) {
-  const step = n > 1 ? Math.min(0.7, (Math.PI * 1.1) / (n - 1)) : 0;
-  const angle = Math.PI / 2 + ((n - 1) / 2 - i) * step;
-  return { x: 50 + 39 * Math.cos(angle), y: 40 + 50 * Math.sin(angle) };
+  const angle = Math.PI / 2 + (i * 2 * Math.PI) / n;
+  // Narrower than the felt so side seats stay on screen; seats near 3 and 9 o'clock move up or down clear of the middle.
+  const sin = Math.sin(angle);
+  return { x: 38 * Math.cos(angle), y: 42 * Math.sign(sin || 1) * Math.max(Math.abs(sin), 0.35) };
 }
-const DEALER = { x: 50, y: 16 };
+const at = ({ x, y }: { x: number; y: number }) => ({ left: `${50 + x}%`, top: `${50 + y}%` });
+/** Where the app sits when it deals alone: the top of the table. */
+const HOUSE = { x: 0, y: -30 };
 
 export default function PokDengTable({ state, heroId, invite }: Props) {
-  // The opening deal goes one card at a time: each player in seat order, then the dealer, twice round.
   const players = state.players;
-  const inPlay = players.filter((p) => p.bet > 0);
-  const dealAt = (slot: number, round: number) => (round * (inPlay.length + 1) + slot) * DEAL_STEP;
-  const dealEnd = dealAt(inPlay.length, 1) + FLY_MS + FLIP_PAUSE + FLIP_MS; // last card dealt and turned over
-  // A third card flies in straight away.
-  const playerDeal = (p: Player) => (card: number) => (card < 2 ? dealAt(inPlay.indexOf(p), card) : 0);
+  const { hands } = state;
+  // The deal goes one card at a time in dealing order: the seated hands, the dealer, then the hands that sit last.
+  const dealerSlot = hands.filter((h) => h.spot !== 'last').length;
+  const slots = hands.length + 1;
+  const slotOf = (h: Hand) => hands.indexOf(h) + (h.spot === 'last' ? 1 : 0);
+  const dealAt = (slot: number, round: number) => (round * slots + slot) * DEAL_STEP;
+  const dealEnd = dealAt(slots - 1, 1) + FLY_MS + FLIP_PAUSE + FLIP_MS; // last card dealt and turned over
+  const handDeal = (h: Hand, card: number) => (card < 2 ? dealAt(slotOf(h), card) : 0); // a drawn card flies in straight away
 
-  // At settlement every hidden hand turns over, then the dealer's third card (if any) comes in; results wait
-  // until the last card is face up. Worked out once per round so re-renders don't restart it.
+  // At settlement every hidden hand turns over and the dealer's third card (if any) comes in; results wait until the
+  // last card is face up. Worked out once per round so re-renders don't restart it.
   const dealerShown = useRef(0);
   const reveal = useRef({ round: -1, from: 0, delay: 0 });
   if (state.phase === 'settled' && reveal.current.round !== state.round) {
     const from = dealerShown.current;
     const drawn = state.dealer.length - from;
-    const end = from === 0 ? dealEnd : REVEALED + (drawn > 0 ? FLY_MS + FLIP_PAUSE + FLIP_MS : 0); // from 0: dealt and settled at once (a dealer pok)
+    const end = from === 0 ? dealEnd : REVEALED + (drawn > 0 ? FLY_MS + FLIP_PAUSE + FLIP_MS : 0); // from 0: dealt and settled at once (a dealer Pok)
     reveal.current = { round: state.round, from, delay: end + 200 };
   }
   useEffect(() => {
     dealerShown.current = state.dealer.length;
   });
   const settled = state.phase === 'settled';
-  const { from, delay } = settled ? reveal.current : { from: state.dealer.length, delay: 0 };
+  const { from, delay } = settled ? reveal.current : { from: state.dealer.length, delay: REVEALED + 200 }; // mid-round: hands just caught
   const queuePos = state.queue.findIndex((q) => q.id === heroId);
-  const dealerLabel = handLabel(state.dealer);
+
+  const heroIndex = Math.max(0, players.findIndex((p) => p.id === heroId));
+  const ordered = [...players.slice(heroIndex), ...players.slice(0, heroIndex)]; // you first, then clockwise
+  const pointOf = (id: string | null) => (id && ordered.some((p) => p.id === id) ? seatPoint(ordered.findIndex((p) => p.id === id), ordered.length) : HOUSE);
+  const dealerAt = pointOf(state.bankerId);
+  const dealerHand = (size: keyof typeof SIZE) => (
+    <DealerHand
+      state={state}
+      size={size}
+      dealDelay={(i) => (settled && from > 0 ? REVEALED + (i - from) * DEAL_STEP : i < 2 ? dealAt(dealerSlot, i) : 0)}
+      labelDelay={settled ? delay - 200 : state.caught ? REVEALED : dealEnd}
+    />
+  );
 
   return (
     <div data-table className="relative mx-auto h-full max-h-[56rem] w-full max-w-5xl [container-type:size]">
-      <div className="table-felt absolute inset-x-[7%] top-[2%] bottom-[8%] rounded-t-[3rem] rounded-b-[50%] border-8 border-amber-950 shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
+      <div className="table-felt absolute inset-x-[9%] inset-y-[13%] rounded-[50%] border-8 border-amber-950 shadow-[inset_0_0_48px_rgba(2,6,23,.55),0_24px_60px_-20px_rgba(2,6,23,.8)] tall:border-[12px]" />
 
-      {/* The deck cards are dealt from, at the dealer's left. */}
-      <div data-deck aria-hidden className="absolute top-[7%] left-[78%] size-0" />
+      {/* Cards are dealt from the middle of the table. */}
+      <div data-deck aria-hidden className="absolute top-1/2 left-1/2 size-0" />
 
-      {state.dealer.length > 0 && (
-        <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${DEALER.x}%`, top: `${DEALER.y}%` }}>
-          <div className="relative flex gap-1 sm:gap-1.5">
-            {state.dealer.map((c, i) => (
-              <CardView
-                key={`${state.round}-${i}`}
-                card={c}
-                size="large"
-                dealDelay={settled && from > 0 ? REVEALED + (i - from) * DEAL_STEP : i < 2 ? dealAt(inPlay.length, i) : 0}
-                flipDelay={FLIP_PAUSE}
-              />
-            ))}
-            {dealerLabel && (
-              <span
-                key={`${state.round}-${dealerLabel}`}
-                className="rise-in absolute -top-2 -right-3 rounded-full bg-slate-950 px-2 py-0.5 font-mono text-xs font-semibold whitespace-nowrap text-slate-50 ring-1 ring-white/20 tall:text-sm"
-                style={{ animationDelay: `${settled ? delay - 200 : dealEnd}ms` }}
-              >
-                {dealerLabel}
-              </span>
-            )}
-          </div>
+      {/* Alone at the table, the app deals from the top. */}
+      {state.started && !state.bankerId && (
+        <div className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1" style={at(HOUSE)}>
+          <p className="text-[10px] font-semibold tracking-[0.2em] text-yellow-100/70 uppercase sm:text-xs">The house deals</p>
+          {dealerHand('large')}
         </div>
       )}
 
-      <div className="absolute inset-x-0 top-[30%] flex flex-col items-center text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {!state.started ? (
           <div className="rise-in flex flex-col items-center gap-2">
             {invite}
@@ -308,10 +371,12 @@ export default function PokDengTable({ state, heroId, invite }: Props) {
             </p>
           </div>
         ) : (
-          <>
+          <div className="flex max-w-[50cqw] flex-col items-center">
             <p className="text-[10px] font-semibold tracking-[0.25em] text-yellow-100/55 uppercase sm:text-xs tall:text-sm">Pok 8 and 9 win on two cards</p>
             <p className="mt-0.5 text-[10px] tracking-wider text-yellow-100/45 uppercase sm:text-xs">
-              Dealer draws on 4 or less · Minimum bet <span className="font-mono">{state.config.minBet}</span>
+              Minimum bet <span className="font-mono">{state.config.minBet}</span>
+              {state.maxBet !== null && <> · Limit <span className="font-mono">{state.maxBet}</span></>}
+              {state.caught && <> · Caught the {state.caught}-card hands</>}
             </p>
             {state.phase === 'betting' && state.deadline && (
               <div className="rise-in mt-3 flex w-40 flex-col items-center gap-1.5 sm:w-52">
@@ -320,28 +385,34 @@ export default function PokDengTable({ state, heroId, invite }: Props) {
               </div>
             )}
             {state.phase === 'waiting' && <p className="mt-3 text-sm text-yellow-50/80">{state.botMatch && players.length === 1 && !state.queue.length ? `${players[0].name} wins the match!` : 'Waiting for players…'}</p>}
-          </>
+          </div>
         )}
       </div>
 
-      {players.map((p, i) => {
-        const point = seatPoint(i, players.length);
+      {ordered.map((p, i) => {
+        const point = seatPoint(i, ordered.length);
         return (
-          <div key={p.id} className="absolute -translate-x-1/2 -translate-y-full" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
-            <Seat p={p} state={state} isHero={p.id === heroId} revealDelay={delay} dealDelay={playerDeal(p)} dealEnd={dealEnd} />
+          <div
+            key={p.id}
+            // Your seat hangs from the table's bottom edge, so it never covers the controls; seats along the top hang
+            // from near their name, so their cards stay on the table instead of under the header.
+            className={`absolute -translate-x-1/2 ${i === 0 ? '-translate-y-full' : point.y < -30 ? '-translate-y-6' : '-translate-y-1/2'}`}
+            style={i === 0 ? { left: '50%', top: '100%' } : at(point)}
+          >
+            <Seat p={p} state={state} isHero={p.id === heroId} revealDelay={delay} dealDelay={handDeal} dealEnd={dealEnd} dealerHand={dealerHand(i === 0 ? 'large' : 'seat')} top={i > 0 && point.y < 0} />
           </div>
         );
       })}
 
-      {/* Winnings slide from the dealer to each winner's seat. */}
+      {/* Winnings slide from the dealer to each winning hand's seat. */}
       {settled &&
-        players.flatMap((p, i) => {
-          if (p.net <= 0) return [];
-          const point = seatPoint(i, players.length);
-          const travel = { '--dx': point.x - DEALER.x, '--dy': point.y - 8 - DEALER.y, animationDelay: `${delay + 400}ms` } as CSSProperties;
+        hands.flatMap((h) => {
+          if (h.net <= 0 || !ordered.some((p) => p.id === h.owner)) return [];
+          const to = pointOf(h.owner);
+          const travel = { '--dx': to.x - dealerAt.x, '--dy': to.y - dealerAt.y, animationDelay: `${delay + 400}ms` } as CSSProperties;
           return (
-            <div key={`${state.round}-${p.id}`} aria-hidden className="pot-to-winner pointer-events-none absolute" style={{ left: `${DEALER.x}%`, top: `${DEALER.y}%`, ...travel }}>
-              <Chips amount={p.bet + p.net} />
+            <div key={`${state.round}-${h.id}`} aria-hidden className="pot-to-winner pointer-events-none absolute" style={{ ...at(dealerAt), ...travel }}>
+              <Chips amount={h.bet + h.net} />
             </div>
           );
         })}

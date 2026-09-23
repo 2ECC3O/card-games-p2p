@@ -12,7 +12,7 @@ Poker, blackjack, roulette, eight-ball pool and Pok Deng you play with friends i
 | Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
 | Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
 | Eight-ball pool | 1 to 4, with bots | the other team | [play](https://2ecc3o.github.io/card-games-p2p/pool/) |
-| Pok Deng | 1 to 7, with bots | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/pokdeng/) |
+| Pok Deng | 1 to 7, with bots | whoever deals this round (it rotates; alone, the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/pokdeng/) |
 
 ## Start a game in a minute
 

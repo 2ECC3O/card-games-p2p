@@ -1,6 +1,6 @@
 import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { BetControls, PlayControls } from './components/ActionControls';
+import { BetControls, DealerControls, LimitControls, PlayControls } from './components/ActionControls';
 import PokDengTable from './components/PokDengTable';
 import InviteCard from './components/InviteCard';
 import HowToPlay from './components/HowToPlay';
@@ -62,6 +62,7 @@ export default function App() {
   const [code, setCode] = useState(urlRoom);
   const [stack, setStack] = useState('1000');
   const [minBet, setMinBet] = useState<(typeof MIN_BETS)[number]>(10);
+  const [mustDraw, setMustDraw] = useState(false);
   const [busy, setBusy] = useState<'join' | 'create' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -120,7 +121,7 @@ export default function App() {
     const startingStack = Number(stack);
     if (!Number.isInteger(startingStack) || startingStack < minBet * 2)
       return setNotice(`The starting stack must be a whole number of at least ${minBet * 2} (two minimum bets).`);
-    const config: TableConfig = { startingStack, minBet };
+    const config: TableConfig = { startingStack, minBet, mustDraw };
 
     setBusy('create');
     setNotice(null);
@@ -172,10 +173,11 @@ export default function App() {
 
   const me = game && net ? game.players.find((p) => p.id === net.me.id) : undefined;
   const myTurn = !!game && !!me && game.phase === 'playing' && game.activeId === me.id;
-  const myBet = !!game && !!me && game.phase === 'betting' && !me.bet;
+  const dealing = !!game && !!me && game.bankerId === me.id;
+  const myBet = !!game && !!me && game.phase === 'betting' && !dealing && !me.ready;
 
   // Chime once when betting opens for us and once per decision.
-  const chimeKey = myTurn || myBet ? `${game!.round}-${game!.phase}` : null;
+  const chimeKey = myTurn || myBet ? `${game!.round}-${game!.phase}-${game!.activeHand}-${game!.caught}` : null;
   useEffect(() => {
     if (chimeKey && !muted) chime();
   }, [chimeKey, muted, chime]);
@@ -203,12 +205,12 @@ export default function App() {
         <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 05 / Pok Deng</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="♦"><p className="edition">1–7 players · Against the dealer</p>
+            <header className="lobby-intro" data-mark="♦"><p className="edition">1–7 players · Take turns dealing</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Pok Deng <span className="text-yellow-400">P2P</span>
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
-                The Thai card game of eights and nines, with friends against the dealer. Virtual chips, no sign-up.
+                The Thai card game of eights and nines, with the deal passing round the table. Virtual chips, no sign-up.
               </p>
             </header>
             <div>
@@ -280,7 +282,11 @@ export default function App() {
               <Segmented name="minBet" options={MIN_BETS} value={minBet} onChange={setMinBet} />
             </fieldset>
 
-            <p className="mt-2 text-sm text-slate-400">One deck, shuffled every round. Deng can multiply a win or a loss up to 5 times the bet.</p>
+            <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input type="checkbox" checked={mustDraw} onChange={(e) => setMustDraw(e.target.checked)} className="size-5 accent-yellow-600" />
+              House rule: under 4 on two cards must draw
+            </label>
+            <p className="mt-2 text-sm text-slate-400">The dealer passes clockwise each round; alone, the app deals. One deck, shuffled every round. Deng multiplies a win or a loss up to 5 times the bet.</p>
 
             <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
               {busy === 'create' ? 'Creating room…' : 'Create room'}
@@ -317,6 +323,7 @@ export default function App() {
     setMuted(!muted);
   };
   const activeName = game.players.find((p) => p.id === game.activeId)?.name ?? 'another player';
+  const dealerTurn = game.phase === 'playing' && game.activeHand === null;
 
   return (
     <main className="table-room flex h-dvh flex-col overflow-hidden" style={{ '--accent': '#8a6208', '--felt': '#6e5610' } as import('react').CSSProperties}>
@@ -377,8 +384,12 @@ export default function App() {
       </div>
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
-        {myTurn ? (
-          <PlayControls key={game.round} onAction={(a) => net.act(a)} />
+        {myTurn && dealerTurn ? (
+          <DealerControls key={`${game.round}-${game.caught}`} state={game} onAction={(a) => net.act(a)} />
+        ) : myTurn ? (
+          <PlayControls key={`${game.round}-${game.activeHand}`} state={game} heroId={net.me.id} onAction={(a) => net.act(a)} />
+        ) : dealing && game.phase === 'betting' ? (
+          <LimitControls state={game} onAction={(a) => net.act(a)} />
         ) : myBet ? (
           <BetControls key={game.round} state={game} heroId={net.me.id} onAction={(a) => net.act(a)} />
         ) : isHost && !game.started ? (
@@ -406,7 +417,7 @@ export default function App() {
         ) : (
           <p className="px-3 pb-3 text-center text-sm text-slate-400 sm:text-base" aria-live="polite">
             {game.phase === 'playing'
-              ? `Waiting for ${activeName}…`
+              ? `Waiting for ${activeName}${dealerTurn ? ', the dealer' : ''}…`
               : game.phase === 'betting'
                 ? 'Waiting for the other bets…'
                 : game.phase === 'settled'

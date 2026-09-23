@@ -8,7 +8,7 @@ import { iceServers } from './iceServers';
 import { sha256 } from './sha256';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
-const PREFIX = 'p2p-pokdeng-v1-';
+const PREFIX = 'p2p-pokdeng-v2-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -84,7 +84,10 @@ async function openPeer(id?: string): Promise<Peer> {
 const str = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max;
 const validAction = (a: unknown): a is PlayerAction => {
   const x = a as PlayerAction | null;
-  return !!x && (['draw', 'stay'].includes(x.type) || (x.type === 'bet' && Number.isInteger(x.amount)));
+  return !!x && (['draw', 'stay', 'ready', 'clear'].includes(x.type)
+    || (x.type === 'bet' && Number.isInteger(x.amount) && str(x.spot, 64) && (x.ready === undefined || typeof x.ready === 'boolean'))
+    || (x.type === 'limit' && (x.amount === null || Number.isInteger(x.amount)))
+    || (x.type === 'catch' && (x.cards === 2 || x.cards === 3)));
 };
 
 export class TableNet {
