@@ -2,6 +2,8 @@ import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } f
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ActionControls from './components/ActionControls';
 import InviteCard from './components/InviteCard';
+import HowToPlay from './components/HowToPlay';
+import { RULES } from './components/rules';
 import PokerTable from './components/PokerTable';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
@@ -226,6 +228,9 @@ export default function App() {
                 Texas Hold'em with friends, right in the browser. Virtual chips, no sign-up.
               </p>
             </header>
+            <div>
+              <HowToPlay pages={RULES} />
+            </div>
 
             {inAppHint && (
               <div className="rise-in flex items-start gap-3 rounded-xl bg-slate-900/80 px-3.5 py-3 text-sm text-slate-200 ring-1 ring-white/15" role="note">
@@ -369,6 +374,7 @@ export default function App() {
           <QrCodeIcon size={18} aria-hidden />
           <span className="sr-only sm:not-sr-only">Invite</span>
         </button>
+        <HowToPlay pages={RULES} compact />
 
         <div className="flex min-w-0 flex-1 flex-col items-center justify-center text-xs leading-tight text-slate-400 sm:flex-row sm:gap-4 sm:text-sm">
           {status === 'reconnecting' ? (

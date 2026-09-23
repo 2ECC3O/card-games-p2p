@@ -168,7 +168,7 @@ Things phones do differently:
 - **Screen lock and app switching pause the page.** While you're at a table the app asks the browser to keep
   the screen on (HTTPS only, and the browser may refuse, e.g. in battery saver). If a phone does lock:
   the room creator's seat is taken over by another player after about 6 seconds, a player whose turn it is
-  gets checked or folded after 30 seconds, and anyone who comes back within 60 seconds keeps their seat.
+  gets checked or folded after 60 seconds, and anyone who comes back within 60 seconds keeps their seat.
 - **Sound:** iPhones only allow sound after a tap, so the turn chime is switched on by your first tap on the
   page (Create, Join, Start...). No vibration on iPhones; Safari doesn't support it.
 - **Links opened inside apps** (Instagram, Facebook, Messenger, LINE, Snapchat, TikTok, WeChat...) open in
@@ -183,7 +183,7 @@ Things phones do differently:
 - **Join a room:** enter your name and the 6-character room code, or open an invite link.
 - **Start:** the host can start alone against one automatic bot, add more bots, or play with friends. Busted bots leave permanently; the match stops when one seat remains.
 - **Watching:** spectators see live hand-win chances beside the seats; the TOURNAMENT display also shows them in its leaderboard. Before the river these are estimates from 240 random runouts, with ties split. The completed board is exact. Players never see opponents' live odds.
-- **Your turn:** you have 30 seconds, shown as a countdown and a draining bar on your name card
+- **Your turn:** you have 60 seconds, shown as a countdown and a draining bar on your name card
   (everyone can see whose turn it is). If time runs out you check when you can, otherwise you fold.
   A short chime plays when the action reaches you; the speaker button in the header mutes it.
 - **Betting:** Fold, Check or Call, and Bet/Raise with the slider or the ½ pot, Pot and Max shortcuts.
@@ -295,7 +295,7 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 | Seats per table | 10 (`MAX_SEATS`) |
 | People in a room, seated plus queued | 30 (`MAX_MEMBERS`) |
 | Waiting queue | 20 (`MAX_QUEUE`) |
-| Time per turn | 30 s (`TURN_MS`) |
+| Time per turn | 60 s (`TURN_MS`) |
 | Pause after a showdown | 6 s (`SHOWDOWN_MS`) |
 | Room closes after no player action for | 5 min (`IDLE_MS`) |
 | Ping interval / host considered gone after | 2 s / 6 s (`PING_MS`, `DEAD_MS`) |

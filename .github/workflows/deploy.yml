@@ -18,7 +18,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        game: [poker, blackjack, roulette, pool]
+        game: [poker, blackjack, roulette, pool, pokdeng]
     defaults:
       run:
         working-directory: ${{ matrix.game }}

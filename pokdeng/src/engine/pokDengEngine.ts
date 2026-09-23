@@ -1,26 +1,19 @@
-import type { Card, GameState, Hand, Player, PlayerAction, TableConfig } from '../types/blackjack';
+import type { Card, GameState, Player, PlayerAction, TableConfig } from '../types/pokdeng';
 
 export const MAX_SEATS = 7;
 export const MAX_QUEUE = 20;
-export const MAX_HANDS = 4; // split up to three times
 export const BET_MS = 30_000;
 export const TURN_MS = 60_000;
 export const SETTLE_MS = 6_000;
-/** Extra results time while the table turns the hole card over and deals the dealer's draws (per card). */
-const REVEAL_MS = 1_000;
-const DRAW_MS = 900;
+/** Extra results time while the table turns every hand over and the dealer draws. */
+const REVEAL_MS = 1_500;
 export const IDLE_MS = 5 * 60_000;
 export const isBot = (id: string) => /^bot:\d+$/.test(id);
 const BOT_DELAY_MS = 1_000;
-/** Reshuffle once less than this share of the shoe is left. */
-const CUT = 0.25;
+/** The dealer and bots draw a third card on a score of 4 or less. */
+const DRAW_ON = 4;
 
 // ------------------------------------------------ cards
-
-function newShoe(decks: number): Card[] {
-  const deck = [...'23456789TJQKA'].flatMap((r) => [...'shdc'].map((s) => `${r}${s}` as Card));
-  return shuffle(Array.from({ length: decks }, () => deck).flat());
-}
 
 /** Unbiased crypto-random integer in [0, n). */
 function randomInt(n: number): number {
@@ -31,30 +24,58 @@ function randomInt(n: number): number {
   return buf[0] % n;
 }
 
-/** Fisher-Yates, in place. */
-function shuffle<T>(items: T[]): T[] {
-  for (let i = items.length - 1; i > 0; i--) {
+/** One fresh deck per round, Fisher-Yates shuffled. */
+function newDeck(): Card[] {
+  const d = [...'23456789TJQKA'].flatMap((r) => [...'shdc'].map((s) => `${r}${s}` as Card));
+  for (let i = d.length - 1; i > 0; i--) {
     const j = randomInt(i + 1);
-    [items[i], items[j]] = [items[j], items[i]];
+    [d[i], d[j]] = [d[j], d[i]];
   }
-  return items;
+  return d;
 }
 
-/** Best total, counting one ace as 11 when that doesn't bust. Face-down cards count as nothing. */
-export function handValue(cards: Card[]): { total: number; soft: boolean } {
-  let total = 0;
-  let aces = 0;
-  for (const c of cards) {
-    if (c === '??') continue;
-    if (c[0] === 'A') aces++;
-    total += c[0] === 'A' ? 1 : 'TJQK'.includes(c[0]) ? 10 : Number(c[0]);
-  }
-  const soft = aces > 0 && total + 10 <= 21;
-  return { total: soft ? total + 10 : total, soft };
+const ORDER = 'A23456789TJQK';
+const point = (c: Card) => (c[0] === 'A' ? 1 : 'TJQK'.includes(c[0]) ? 0 : Number(c[0]));
+
+/** Last digit of the card total. Hidden cards count as nothing. */
+export const score = (cards: Card[]) => cards.filter((c) => c !== '??').reduce((n, c) => n + point(c), 0) % 10;
+
+export const isPok = (cards: Card[]) => cards.length === 2 && !cards.includes('??') && score(cards) >= 8;
+
+function isStraight(cards: Card[]) {
+  const i = cards.map((c) => ORDER.indexOf(c[0])).sort((a, b) => a - b);
+  const run = (a: number[]) => a[1] === a[0] + 1 && a[2] === a[1] + 1;
+  // Ace plays low (A-2-3) or high (Q-K-A), never round the corner.
+  return run(i) || (i[0] === 0 && run([i[1], i[2], 13]));
 }
 
-export const isBlackjack = (cards: Card[]) => cards.length === 2 && handValue(cards).total === 21;
-const rankValue = (c: Card) => handValue([c]).total;
+/** Hand class (higher beats lower) and its name. Three-card specials only exist after drawing. */
+export function handType(cards: Card[]): { rank: number; name: string } {
+  if (cards.length !== 3 || cards.includes('??')) return isPok(cards) ? { rank: 5, name: `Pok ${score(cards)}` } : { rank: 0, name: `${score(cards)}` };
+  const flush = cards.every((c) => c[1] === cards[0][1]);
+  if (cards.every((c) => c[0] === cards[0][0])) return { rank: 4, name: 'Tong' };
+  if (isStraight(cards)) return flush ? { rank: 3, name: 'Straight flush' } : { rank: 2, name: 'Straight' };
+  if (cards.every((c) => 'JQK'.includes(c[0]))) return { rank: 1, name: 'Three faces' };
+  return { rank: 0, name: `${score(cards)}` };
+}
+
+/** Bet multiplier of a hand. */
+export function deng(cards: Card[]): number {
+  if (cards.includes('??')) return 1;
+  const flush = cards.every((c) => c[1] === cards[0][1]);
+  if (cards.length === 2) return flush || cards[0][0] === cards[1][0] ? 2 : 1;
+  const { rank } = handType(cards);
+  return rank >= 3 ? 5 : rank >= 1 || flush ? 3 : 1;
+}
+
+/** Player's result against the dealer, in bets: +deng for a win, −deng for a loss, deng difference on a tie. */
+export function compare(player: Card[], dealer: Card[]): number {
+  const p = handType(player), d = handType(dealer);
+  const [ps, ds] = [score(player), score(dealer)];
+  if (p.rank !== d.rank) return p.rank > d.rank ? deng(player) : -deng(dealer);
+  if (ps !== ds) return ps > ds ? deng(player) : -deng(dealer);
+  return deng(player) - deng(dealer);
+}
 
 // ------------------------------------------------ helpers
 
@@ -65,19 +86,19 @@ const update = (state: GameState, fn: (s: GameState) => void): GameState => {
 };
 
 const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
+const draw = (s: GameState) => s.deck.pop()!; // 7 seats × 3 + 3 never runs out of 52
 
-function draw(s: GameState): Card {
-  if (!s.shoe.length) s.shoe = newShoe(s.config.decks); // only with a huge table on one deck
-  return s.shoe.pop()!;
+function clearHand(p: Player) {
+  Object.assign(p, { cards: [], bet: 0, done: false, outcome: null, net: 0 });
 }
-
-const newHand = (bet: number, cards: Card[] = [], split = false): Hand => ({ cards, bet, doubled: false, split, done: false, outcome: null, payout: 0 });
 
 function seat(s: GameState, id: string, name: string, chips: number, connected: boolean) {
   const taken = new Set(s.players.map((p) => p.seat));
   let free = 0;
   while (taken.has(free)) free++;
-  s.players.push({ id, name, seat: free, chips, hands: [], lastBet: s.config.minBet, connected, left: false });
+  const p = { id, name, seat: free, chips, lastBet: s.config.minBet, connected, left: false } as Player;
+  clearHand(p);
+  s.players.push(p);
   s.players.sort((a, b) => a.seat - b.seat);
 }
 
@@ -95,8 +116,8 @@ export function cleanName(name: unknown): string {
 
 export function createGame(roomCode: string, config: TableConfig, now: number): GameState {
   return {
-    roomCode, config, started: false, botMatch: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], dealer: [], shoe: [],
-    activeId: null, activeHand: 0, deadline: null, nextRoundAt: null, lastActionAt: now,
+    roomCode, config, started: false, botMatch: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [], dealer: [], deck: [],
+    activeId: null, deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
 
@@ -143,7 +164,7 @@ export function setConnected(state: GameState, id: string, connected: boolean): 
 }
 
 /** Can't cover the table minimum, and has nothing riding on the current round. */
-export const isBroke = (s: GameState, p: Player) => p.chips < s.config.minBet && !(s.phase === 'playing' && p.hands.length > 0);
+export const isBroke = (s: GameState, p: Player) => p.chips < s.config.minBet && !(s.phase === 'playing' && p.bet > 0);
 
 /** Broke players ask to be dealt back in with a fresh stack. */
 export function rejoinQueue(state: GameState, id: string, name: string, now: number): GameState {
@@ -167,9 +188,9 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
       if (s.phase === 'betting') dealIfAllBet(s, now);
       return;
     }
-    // Mid-round: their hands stand as they are; the seat is cleared at the next round.
+    // Mid-round: their hand stays as it is; the seat is cleared at the next round.
     p.left = true;
-    for (const h of p.hands) h.done = true;
+    p.done = true;
     if (s.activeId === id) nextTurn(s, now);
   });
 }
@@ -200,108 +221,66 @@ export function startGame(state: GameState, now: number): GameState {
 
 // ------------------------------------------------ round flow
 
-/** Mutates: open the betting window. `shoe` lets tests stack the cards (dealt with pop()). */
-export function startRound(s: GameState, now: number, shoe?: Card[]) {
+/** Mutates: open the betting window. `deck` lets tests stack the cards (dealt with pop()). */
+export function startRound(s: GameState, now: number, deck?: Card[]) {
   s.players = s.players.filter((p) => p.chips >= s.config.minBet && !p.left);
   while (s.players.length < MAX_SEATS && s.queue.length) {
     const q = s.queue.shift()!;
     seat(s, q.id, q.name, s.config.startingStack, q.connected);
   }
-  for (const p of s.players) p.hands = [];
-  Object.assign(s, { dealer: [], activeId: null, activeHand: 0, deadline: null, nextRoundAt: null });
+  s.players.forEach(clearHand);
+  Object.assign(s, { dealer: [], activeId: null, deadline: null, nextRoundAt: null });
   if (s.players.length === 0 || (s.botMatch && s.players.length === 1 && !s.queue.length)) {
     s.phase = 'waiting';
     return;
   }
-  if (shoe) s.shoe = shoe;
-  else if (s.shoe.length < s.config.decks * 52 * CUT) s.shoe = newShoe(s.config.decks);
+  s.deck = deck ?? newDeck();
   s.round++;
   s.phase = 'betting';
   s.deadline = now + BET_MS;
 }
 
 function dealIfAllBet(s: GameState, now: number) {
-  if (s.players.length && s.players.every((p) => p.hands.length > 0)) deal(s, now);
+  if (s.players.length && s.players.every((p) => p.bet > 0)) deal(s, now);
 }
 
-/** Two cards each, dealer included; players who didn't bet sit this round out. */
+/** Two cards each, dealer last; players who didn't bet sit this round out. */
 function deal(s: GameState, now: number) {
-  const inPlay = s.players.filter((p) => p.hands.length > 0);
+  const inPlay = s.players.filter((p) => p.bet > 0);
   if (!inPlay.length) return startRound(s, now); // nobody bet: open a fresh window
   for (let round = 0; round < 2; round++) {
-    for (const p of inPlay) p.hands[0].cards.push(draw(s));
+    for (const p of inPlay) p.cards.push(draw(s));
     s.dealer.push(draw(s));
   }
   s.phase = 'playing';
-  // The dealer peeks: with a blackjack the round ends before anyone acts.
-  if (isBlackjack(s.dealer)) return settle(s, now);
+  for (const p of s.players) p.done = p.bet === 0 || isPok(p.cards); // a pok is shown at once and can't draw
+  // Dealer pok: everyone is compared on two cards straight away.
+  if (isPok(s.dealer)) return settle(s, now);
   nextTurn(s, now);
 }
 
-/** Hand the turn to the first unfinished hand in seat order, or let the dealer play. */
 function nextTurn(s: GameState, now: number) {
-  for (const p of s.players) {
-    for (let i = 0; i < p.hands.length; i++) {
-      const h = p.hands[i];
-      if (h.done) continue;
-      if (h.cards.length < 2) h.cards.push(draw(s)); // second card of a split hand
-      if (handValue(h.cards).total >= 21) {
-        h.done = true;
-        continue;
-      }
-      s.activeId = p.id;
-      s.activeHand = i;
-      s.deadline = now + TURN_MS;
-      return;
-    }
-  }
-  settle(s, now);
+  const next = s.players.find((p) => !p.done);
+  if (!next) return settle(s, now);
+  s.activeId = next.id;
+  s.deadline = now + TURN_MS;
 }
 
 function settle(s: GameState, now: number) {
-  Object.assign(s, { activeId: null, activeHand: 0, deadline: null, phase: 'settled', nextRoundAt: now + SETTLE_MS });
-  const hands = s.players.flatMap((p) => p.hands);
-  const dealerBJ = isBlackjack(s.dealer);
-  const natural = (h: Hand) => !h.split && isBlackjack(h.cards);
-  // The dealer only draws if some hand still needs beating. Stands on all 17s.
-  if (!dealerBJ && hands.some((h) => handValue(h.cards).total <= 21 && !natural(h))) {
-    while (handValue(s.dealer).total < 17) s.dealer.push(draw(s));
-  }
-  s.nextRoundAt! += REVEAL_MS + (s.dealer.length - 2) * DRAW_MS; // time to show it all before the results
-  const dealerTotal = handValue(s.dealer).total;
+  Object.assign(s, { activeId: null, deadline: null, phase: 'settled', nextRoundAt: now + SETTLE_MS + REVEAL_MS });
+  // ponytail: the dealer draws by a fixed rule instead of choosing per player, as a human banker may.
+  if (!isPok(s.dealer) && score(s.dealer) <= DRAW_ON) s.dealer.push(draw(s));
   for (const p of s.players) {
-    for (const h of p.hands) {
-      const v = handValue(h.cards).total;
-      h.done = true;
-      if (v > 21) [h.outcome, h.payout] = ['bust', 0];
-      else if (dealerBJ) [h.outcome, h.payout] = natural(h) ? ['push', h.bet] : ['lose', 0];
-      else if (natural(h)) [h.outcome, h.payout] = ['blackjack', h.bet + Math.floor((h.bet * 3) / 2)]; // pays 3 to 2
-      else if (dealerTotal > 21 || v > dealerTotal) [h.outcome, h.payout] = ['win', h.bet * 2];
-      else if (v === dealerTotal) [h.outcome, h.payout] = ['push', h.bet];
-      else [h.outcome, h.payout] = ['lose', 0];
-      p.chips += h.payout;
-    }
+    if (!p.bet) continue;
+    p.done = true;
+    // A loss can't take more than the player has.
+    p.net = Math.max(p.bet * compare(p.cards, s.dealer), -(p.bet + p.chips));
+    p.outcome = p.net > 0 ? 'win' : p.net < 0 ? 'lose' : 'push';
+    p.chips += p.bet + p.net;
   }
 }
 
 // ------------------------------------------------ actions
-
-export function legalActions(s: GameState, id: string) {
-  const p = find(s, id);
-  const h = p?.hands[s.activeHand];
-  const twoCards = !!h && h.cards.length === 2;
-  const affordable = !!p && !!h && p.chips >= h.bet;
-  // Why splitting isn't allowed right now, in a few words; null when it is.
-  const splitBlock =
-    !twoCards || rankValue(h.cards[0]) !== rankValue(h.cards[1])
-      ? 'Pairs only'
-      : p!.hands.length >= MAX_HANDS
-        ? `${MAX_HANDS} hands max`
-        : !affordable
-          ? 'Not enough chips'
-          : null;
-  return { canDouble: twoCards && affordable, canSplit: splitBlock === null, splitBlock };
-}
 
 function act(s: GameState, id: string, action: PlayerAction, now: number) {
   const p = find(s, id);
@@ -309,57 +288,19 @@ function act(s: GameState, id: string, action: PlayerAction, now: number) {
 
   if (action.type === 'bet') {
     const { amount } = action;
-    if (s.phase !== 'betting' || p.hands.length) throw new Error('Betting is closed');
+    if (s.phase !== 'betting' || p.bet) throw new Error('Betting is closed');
     if (!Number.isInteger(amount) || amount < s.config.minBet || amount > p.chips) throw new Error('Invalid bet');
     p.chips -= amount;
+    p.bet = amount;
     p.lastBet = amount;
-    p.hands = [newHand(amount)];
     return dealIfAllBet(s, now);
   }
 
   if (s.phase !== 'playing' || s.activeId !== id) throw new Error('Not your turn');
-  const h = p.hands[s.activeHand];
-  const legal = legalActions(s, id);
-  switch (action.type) {
-    case 'hit':
-      h.cards.push(draw(s));
-      if (handValue(h.cards).total >= 21) h.done = true;
-      break;
-    case 'stand':
-      h.done = true;
-      break;
-    case 'double':
-      if (!legal.canDouble) throw new Error('You cannot double');
-      p.chips -= h.bet;
-      h.bet *= 2;
-      h.doubled = true;
-      h.cards.push(draw(s));
-      h.done = true;
-      break;
-    case 'split': {
-      if (!legal.canSplit) throw new Error('You cannot split');
-      p.chips -= h.bet;
-      const second = newHand(h.bet, [h.cards.pop()!], true);
-      h.split = true;
-      h.cards.push(draw(s));
-      p.hands.splice(s.activeHand + 1, 0, second);
-      // Split aces take one card each and stand.
-      if (h.cards[0][0] === 'A') {
-        h.done = true;
-        second.cards.push(draw(s));
-        second.done = true;
-      }
-      break;
-    }
-    default:
-      throw new Error('Unknown action');
-  }
-  if (h.done || handValue(h.cards).total >= 21) {
-    h.done = true;
-    nextTurn(s, now);
-  } else {
-    s.deadline = now + TURN_MS; // fresh clock for the next decision
-  }
+  if (action.type === 'draw') p.cards.push(draw(s));
+  else if (action.type !== 'stay') throw new Error('Unknown action');
+  p.done = true;
+  nextTurn(s, now);
 }
 
 export function applyAction(state: GameState, id: string, action: PlayerAction, now: number): GameState {
@@ -369,37 +310,35 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
   });
 }
 
-/** Host clock: close betting, auto-stand on timeout, deal the next round. Returns the same object when nothing changed. */
+/** Host clock: close betting, auto-stay on timeout, deal the next round. Returns the same object when nothing changed. */
 export function hostTick(state: GameState, now: number): GameState {
   const { phase, activeId, deadline } = state;
   if (phase === 'betting' && deadline !== null && now >= deadline - BET_MS + BOT_DELAY_MS) {
-    const bot = state.players.find((p) => isBot(p.id) && !p.hands.length && p.chips >= state.config.minBet);
+    const bot = state.players.find((p) => isBot(p.id) && !p.bet && p.chips >= state.config.minBet);
     if (bot) return update(state, (s) => act(s, bot.id, { type: 'bet', amount: s.config.minBet }, now));
   }
   if (phase === 'playing' && activeId && isBot(activeId) && deadline !== null && now >= deadline - TURN_MS + BOT_DELAY_MS) {
-    const hand = state.players.find((p) => p.id === activeId)!.hands[state.activeHand];
-    const value = handValue(hand.cards);
-    const upcard = handValue(state.dealer.slice(0, 1)).total;
-    // ponytail: a small public-card strategy; no hidden dealer card or strategy package.
-    const hit = value.soft ? value.total < 18 : value.total < 12 || (value.total < 17 && (upcard < 2 || upcard > 6));
-    return update(state, (s) => act(s, activeId, { type: hit ? 'hit' : 'stand' }, now));
+    const cards = state.players.find((p) => p.id === activeId)!.cards;
+    return update(state, (s) => act(s, activeId, { type: score(cards) <= DRAW_ON ? 'draw' : 'stay' }, now));
   }
   if (deadline !== null && now >= deadline) {
     if (phase === 'betting') return update(state, (s) => deal(s, now)); // timeouts don't count as activity
-    if (phase === 'playing' && activeId) return update(state, (s) => act(s, activeId, { type: 'stand' }, now));
+    if (phase === 'playing' && activeId) return update(state, (s) => act(s, activeId, { type: 'stay' }, now));
   }
-  const ready = (state.players.some((p) => p.chips >= state.config.minBet && !p.left) || state.queue.length > 0)
-    && (!state.botMatch || state.players.filter((p) => p.chips >= state.config.minBet && !p.left).length + state.queue.length > 1);
+  const funded = state.players.filter((p) => p.chips >= state.config.minBet && !p.left).length;
+  const ready = (funded > 0 || state.queue.length > 0) && (!state.botMatch || funded + state.queue.length > 1);
   if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && ready))) {
     return update(state, (s) => startRound(s, now));
   }
   return state;
 }
 
-/** What one viewer may see: no shoe, and the dealer's hole card stays down until the dealer plays (spectators see it). */
+/** What one viewer may see: no deck; while playing, other players' cards and the dealer's stay face down unless a pok was shown. Spectators see all. */
 export function maskFor(state: GameState, viewerId: string): GameState {
   return update(state, (s) => {
-    s.shoe = [];
-    if (s.phase === 'playing' && s.dealer.length > 1 && !isSpectator(s, viewerId)) s.dealer[1] = '??';
+    s.deck = [];
+    if (s.phase !== 'playing' || isSpectator(s, viewerId)) return;
+    s.dealer = s.dealer.map(() => '??');
+    for (const p of s.players) if (p.id !== viewerId && !isPok(p.cards)) p.cards = p.cards.map(() => '??');
   });
 }

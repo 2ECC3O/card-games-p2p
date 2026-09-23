@@ -15,7 +15,7 @@ const { Hand } = pokersolver; // CommonJS package: default import works in Vite 
 export const MAX_SEATS = 10;
 export const isBot = (id: string) => /^bot:\d+$/.test(id);
 export const MAX_QUEUE = 20;
-export const TURN_MS = 30_000;
+export const TURN_MS = 60_000;
 const BOT_DELAY_MS = 1_000;
 export const SHOWDOWN_MS = 6_000;
 /** Extra showdown time while the table turns cards over (per player) and deals an all-in runout (per card). */

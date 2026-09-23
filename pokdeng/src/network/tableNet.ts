@@ -1,14 +1,14 @@
 import Peer, { type DataConnection } from 'peerjs';
 import {
-  addBot, addPlayer, addSpectator, applyAction, cleanName, hostTick, IDLE_MS, isBot, rejoinQueue, removePlayer, setConnected, startGame,
-} from '../engine/poolEngine';
-import type { GameState, PlayerAction } from '../types/pool';
+  addBot, addPlayer, addSpectator, applyAction, cleanName, hostTick, IDLE_MS, isBot, maskFor, rejoinQueue, removePlayer, setConnected, startGame, TURN_MS,
+} from '../engine/pokDengEngine';
+import type { GameState, PlayerAction } from '../types/pokdeng';
 import { decode, encode } from './codec';
 import { iceServers } from './iceServers';
 import { sha256 } from './sha256';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
-const PREFIX = 'p2p-pool-v2-';
+const PREFIX = 'p2p-pokdeng-v1-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
@@ -84,11 +84,7 @@ async function openPeer(id?: string): Promise<Peer> {
 const str = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max;
 const validAction = (a: unknown): a is PlayerAction => {
   const x = a as PlayerAction | null;
-  return !!x && (x.type === 'nextRack'
-    || (x.type === 'place' && Number.isFinite(x.x) && Number.isFinite(x.y))
-    || (x.type === 'choice' && ['accept', 'head', 'spot', 'rebreak-self', 'rebreak-other'].includes(x.option))
-    || (x.type === 'shot' && [x.angle, x.power, x.tipX, x.tipY].every(Number.isFinite)
-      && (x.ball === null || Number.isInteger(x.ball)) && (x.pocket === null || Number.isInteger(x.pocket)) && typeof x.safety === 'boolean'));
+  return !!x && (['draw', 'stay'].includes(x.type) || (x.type === 'bet' && Number.isInteger(x.amount)));
 };
 
 export class TableNet {
@@ -369,7 +365,7 @@ export class TableNet {
     const now = Date.now();
     let state = snap.state;
     for (const m of snap.members) if (m.id !== this.me.id) state = setConnected(state, m.id, false);
-    state = { ...state, turnStartedAt: now }; // our clock may differ from the old host's: restart the shot clock
+    if (state.deadline) state = { ...state, deadline: now + TURN_MS };
     this.becomeHost(state, snap.members);
 
     for (const m of this.members.values()) {
@@ -508,8 +504,8 @@ export class TableNet {
     for (const m of this.members.values()) {
       if (m.id === this.me.id) continue;
       const snapshot = m.id === standbyId ? { state, members, removed: [...this.removed] } : undefined;
-      this.send(m.conn, { t: 'state', state, standbyId, snapshot });
+      this.send(m.conn, { t: 'state', state: maskFor(state, m.id), standbyId, snapshot });
     }
-    if (!this.destroyed) this.events.onState(state);
+    if (!this.destroyed) this.events.onState(maskFor(state, this.me.id));
   }
 }

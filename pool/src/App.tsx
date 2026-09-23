@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import PoolTable from './components/PoolTable';
 import TournamentPanel from './components/TournamentPanel';
 import InviteCard from './components/InviteCard';
+import HowToPlay from './components/HowToPlay';
+import { RULES } from './components/rules';
 import { button, field, label } from './components/ui';
-import { createGame, rackOutlook } from './engine/poolEngine';
+import { createGame, isBot, rackOutlook, SHOT_CLOCK_MS } from './engine/poolEngine';
+import { FRAME_EVERY, HZ, simulate } from './engine/physics';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
-import type { GameState, Pocket, Side } from './types/pool';
+import type { Ball, GameState, Pocket, Side } from './types/pool';
 
 const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, '0')).join('');
 const isTournament = (name: string) => name.trim().toUpperCase() === 'TOURNAMENT';
@@ -17,6 +20,54 @@ function identity(name: string, watch: boolean): Identity {
 }
 
 const pocketNames = ['Top left', 'Top middle', 'Top right', 'Bottom left', 'Bottom middle', 'Bottom right'];
+/** Where to strike the cue ball: a plus of five spots. `area` places each in the 3×3 grid. */
+const TIPS = [
+  { x: 0, y: 1, name: 'Top: follow through', area: '1 / 2' },
+  { x: -1, y: 0, name: 'Left side', area: '2 / 1' },
+  { x: 0, y: 0, name: 'Centre', area: '2 / 2' },
+  { x: 1, y: 0, name: 'Right side', area: '2 / 3' },
+  { x: 0, y: -1, name: 'Bottom: draw back', area: '3 / 2' },
+];
+
+/** Plays each new shot on this screen by re-running the host's shot with the same physics. Null when nothing is rolling. */
+function useReplay(game: GameState | null) {
+  const [frame, setFrame] = useState<Ball[] | null>(null);
+  const seen = useRef<number | null>(null);
+  const shot = game?.lastShot ?? null;
+  const id = game ? (shot?.id ?? 0) : null;
+  useEffect(() => {
+    if (id === null) return void (seen.current = null);
+    const joining = seen.current === null; // don't replay a shot that finished before we arrived
+    const fresh = id !== seen.current;
+    seen.current = id;
+    if (joining || !fresh || !shot || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const frames: Ball[][] = [];
+    simulate(shot.balls, shot, (bodies) => void frames.push(bodies.filter((b) => !b.down).map(({ n, x, y }) => ({ n, x, y }))));
+    const start = performance.now();
+    let raf = requestAnimationFrame(function play(t) {
+      const i = Math.floor(((t - start) / 1000) * (HZ / FRAME_EVERY));
+      if (i >= frames.length) return setFrame(null);
+      setFrame(frames[i]);
+      raf = requestAnimationFrame(play);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      setFrame(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  return frame;
+}
+
+function ShotClock({ start }: { start: number }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(0, Math.ceil((start + SHOT_CLOCK_MS - now) / 1000));
+  return <span className={`pool-clock${left <= 15 ? ' is-low' : ''}`} role="timer" aria-label={`${left} seconds left on the shot clock`}>{left}s</span>;
+}
 
 export default function App() {
   const urlRoom = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
@@ -33,6 +84,7 @@ export default function App() {
   const [power, setPower] = useState(60);
   const [tipX, setTipX] = useState(0);
   const [tipY, setTipY] = useState(0);
+  const [tipOpen, setTipOpen] = useState(false);
   const [calledBall, setCalledBall] = useState<number | null>(null);
   const [calledPocket, setCalledPocket] = useState<Pocket | null>(null);
   const [safety, setSafety] = useState(false);
@@ -41,6 +93,7 @@ export default function App() {
   const autoJoined = useRef(false);
   const inviteRef = useRef<HTMLDialogElement>(null);
   useWakeLock(!!net && !!game);
+  const replay = useReplay(game);
 
   const leaveHome = useCallback((message = '') => {
     netRef.current?.destroy(); netRef.current = null;
@@ -96,8 +149,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    setCalledBall(null); setCalledPocket(null); setSafety(false); setPlacing(false);
-    if (game) setPower(game.breakShot ? 95 : 60);
+    setCalledBall(null); setCalledPocket(null); setSafety(false); setPlacing(false); setTipX(0); setTipY(0); setTipOpen(false);
+    if (game) setPower(game.breakShot ? 100 : 40);
   }, [game?.turnStartedAt]);
 
   if (!net || !game) return <main className="pool-home">
@@ -108,6 +161,7 @@ export default function App() {
         <div className="pool-intro-card"><span className="pool-demo-ball">8</span><div><strong>A proper match in your browser.</strong><small>Virtual table · WPA-style rules · No account</small></div></div>
       </header>
       <div className="pool-lobby-panel">
+        <div style={{ marginBottom: 18 }}><HowToPlay pages={RULES} /></div>
         <label className={label} htmlFor="pool-name">Display name</label>
         <input id="pool-name" className={field} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
         <form onSubmit={onJoin} className="pool-form"><h2>Join a room</h2><label className={label} htmlFor="pool-code">Room code</label>
@@ -125,8 +179,11 @@ export default function App() {
 
   const watching = game.spectators.some((p) => p.id === net.me.id);
   const display = watching && isTournament(net.me.name);
-  const active = game.phase === 'aiming' && game.activeId === net.me.id;
-  const deciding = game.phase === 'choice' && game.activeId === net.me.id;
+  const rolling = replay !== null;
+  const active = game.phase === 'aiming' && game.activeId === net.me.id && !rolling;
+  const deciding = game.phase === 'choice' && game.activeId === net.me.id && !rolling;
+  const clock = !rolling && (game.phase === 'aiming' || game.phase === 'choice') && !!game.activeId && !isBot(game.activeId);
+  const tipName = TIPS.find((t) => t.x === tipX && t.y === tipY)?.name ?? 'Centre';
   const isHost = net.role === 'host';
   const cue = game.balls.find((b) => b.n === 0);
   const group = game.teams[game.turnTeam].group;
@@ -142,22 +199,24 @@ export default function App() {
       : game.choice?.type === 'eight-foul' ? [['spot', 'Spot 8 · cue in hand'], ['rebreak-self', 'We re-break']]
         : [['accept', 'Accept table'], ['head', 'Cue in hand']];
   return <main className="pool-room">
-    <header className="pool-header"><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} />{game.roomCode} ▣</button>
+    <header className="pool-header"><span style={{ display: 'flex', gap: 8 }}><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} />{game.roomCode} ▣</button><HowToPlay pages={RULES} compact /></span>
       <div className="pool-header-center">Rack {game.rack || '—'} <span>·</span> {game.mode === 'doubles' ? 'Doubles' : 'Singles'} <span>·</span> Race to {game.raceTo}</div>
       <button className={button.quiet} onClick={() => { net.leave(); netRef.current = null; leaveHome(); }}>Leave</button></header>
     <div className={`pool-room-body ${display ? 'pool-display' : ''}`}><section className="pool-main" aria-label="Pool table and cue controls">
       <div className="pool-scorebar"><div><strong>{labelTeam(0)}</strong><span>{watching ? `${rackOutlook(game, 0)}% outlook` : game.teams[0].group ?? 'Open'}</span></div><b>{game.teams[0].racks} : {game.teams[1].racks}</b><div><strong>{labelTeam(1)}</strong><span>{watching ? `${rackOutlook(game, 1)}% outlook` : game.teams[1].group ?? 'Open'}</span></div></div>
-      <PoolTable state={game} angle={angle} active={active} placing={placing} calledBall={calledBall} calledPocket={calledPocket}
+      <PoolTable state={game} balls={replay ?? game.balls} angle={angle} power={power} tipX={tipX} tipY={tipY} active={active} placing={placing} calledBall={calledBall} calledPocket={calledPocket}
         onAim={setAngle} onPlace={(x, y) => { net.act({ type: 'place', x, y }); setPlacing(false); }} onCallBall={setCalledBall} onCallPocket={setCalledPocket} />
-      <p className="pool-event" aria-live="polite">{game.phase === 'finished' ? `${labelTeam(game.winner!)} wins the match!` : game.lastEvent || 'Waiting to start.'}</p>
+      <p className="pool-event" aria-live="polite">{game.phase === 'finished' ? `${labelTeam(game.winner!)} wins the match!` : game.lastEvent || 'Waiting to start.'}{clock && <ShotClock key={game.turnStartedAt} start={game.turnStartedAt} />}</p>
       {active && <div className="pool-controls">
         <div className="pool-controls-top"><strong>Your shot</strong><span>{game.breakShot ? 'Break · no call needed' : `${current} · ${group ?? 'open table'}`}</span></div>
         <div className="pool-control-grid"><div className="pool-control-block"><label htmlFor="pool-power">Power <b>{power}%</b></label><input id="pool-power" type="range" min="1" max="100" value={power} onChange={(e) => setPower(Number(e.target.value))} />
           <div className="pool-fine"><span>Fine cue angle</span><button onClick={() => setAngle(angle - Math.PI / 180)} aria-label="Aim left one degree">−1°</button><button onClick={() => setAngle(angle - Math.PI / 900)} aria-label="Aim left 0.2 degrees">−.2°</button><button onClick={() => setAngle(angle + Math.PI / 900)} aria-label="Aim right 0.2 degrees">+.2°</button><button onClick={() => setAngle(angle + Math.PI / 180)} aria-label="Aim right one degree">+1°</button></div>
-          <p className="pool-help">Tap the table to aim. Dashed line predicts the first contact.</p></div>
-          <div className="pool-control-block"><label htmlFor="pool-side">Cue ball hit position</label><div className="pool-spin"><label htmlFor="pool-side">Left / right</label><input id="pool-side" type="range" min="-100" max="100" value={tipX * 100} onChange={(e) => setTipX(Number(e.target.value) / 100)} /></div>
-            <div className="pool-spin"><label htmlFor="pool-vertical">Bottom / top</label><input id="pool-vertical" type="range" min="-100" max="100" value={tipY * 100} onChange={(e) => setTipY(Number(e.target.value) / 100)} /></div>
-            <button className={button.quiet} onClick={() => { setTipX(0); setTipY(0); }}>Center hit</button></div></div>
+          <p className="pool-help">Drag on the table to aim. The dashed line is the cue ball's path; the short lines show where it and the ball it hits go next.</p></div>
+          <div className="pool-control-block pool-tip"><span className="pool-tip-label">Cue ball hit</span>
+            {tipOpen ? <div className="pool-tip-grid" role="group" aria-label="Where to hit the cue ball">{TIPS.map((t) => <button key={t.name} style={{ gridArea: t.area }} aria-label={t.name} aria-pressed={t.x === tipX && t.y === tipY}
+              onClick={() => { setTipX(t.x); setTipY(t.y); setTipOpen(false); }} />)}</div>
+              : <button className="pool-tip-ball" onClick={() => setTipOpen(true)} aria-label={`Cue ball hit: ${tipName}. Change it`}><span className="pool-tip-dot" style={{ left: `${50 + tipX * 28}%`, top: `${50 - tipY * 28}%` }} /></button>}
+            <strong>{tipOpen ? 'Pick a spot' : tipName}</strong></div></div>
         {!game.breakShot && <div className="pool-call"><label>Call ball<select className={field} value={calledBall ?? ''} onChange={(e) => setCalledBall(e.target.value ? Number(e.target.value) : null)} disabled={safety}><option value="">Select ball</option>{legalBalls.map((b) => <option key={b.n} value={b.n}>{b.n}</option>)}</select></label>
           <label>Call pocket<select className={field} value={calledPocket ?? ''} onChange={(e) => setCalledPocket(e.target.value ? Number(e.target.value) as Pocket : null)} disabled={safety}><option value="">Select pocket</option>{pocketNames.map((p, i) => <option key={p} value={i}>{p}</option>)}</select></label>
           <label className="pool-safety"><input type="checkbox" checked={safety} onChange={(e) => setSafety(e.target.checked)} /> Safety</label></div>}
@@ -165,7 +224,7 @@ export default function App() {
           <button className={button.primary} disabled={!canShoot || !cue || placing} onClick={() => net.act({ type: 'shot', angle, power, tipX, tipY, ball: calledBall, pocket: calledPocket, safety })}>Shoot</button></div>
       </div>}
       {deciding && <div className="pool-controls"><strong>Break decision</strong><p>{game.lastEvent}</p><div className="pool-form-actions">{choiceOptions.map(([option, text]) => <button key={option} className={button.secondary} onClick={() => net.act({ type: 'choice', option: option as 'accept' | 'head' | 'spot' | 'rebreak-self' | 'rebreak-other' })}>{text}</button>)}</div></div>}
-      {game.phase === 'between' && <div className="pool-controls pool-center"><p>Next rack begins shortly.</p><button className={button.primary} disabled={watching} onClick={() => net.act({ type: 'nextRack' })}>Next rack now</button></div>}
+      {game.phase === 'between' && <div className="pool-controls pool-center"><p>Next rack begins shortly.</p><button className={button.primary} disabled={watching || rolling} onClick={() => net.act({ type: 'nextRack' })}>Next rack now</button></div>}
       {!game.started && isHost && <div className="pool-controls pool-center"><p>{game.players.length} of {game.mode === 'singles' ? 2 : 4} seats filled. Start fills empty seats with bots.</p><div className="pool-form-actions"><button className={button.primary} onClick={() => net.startGame()}>Start {game.mode} match</button><button className={button.secondary} disabled={game.players.length >= (game.mode === 'singles' ? 2 : 4)} onClick={() => net.addBot()}>Add bot</button></div></div>}
       {watching && !display && <p className="pool-watch">You're watching. Outlook is a rough progress estimate, not measured odds.</p>}
       {notice && <p className="pool-notice" role="status">{notice}</p>}

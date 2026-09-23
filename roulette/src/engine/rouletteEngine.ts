@@ -2,7 +2,7 @@ import type { GameState, Player, PlayerAction, Spot, TableConfig } from '../type
 
 export const MAX_SEATS = 10;
 export const MAX_QUEUE = 20;
-export const BET_MS = 25_000;
+export const BET_MS = 60_000;
 /** The wheel spins this long on every screen before the result shows. */
 export const SPIN_MS = 6_000;
 export const SETTLE_MS = 6_000;

@@ -1,15 +1,14 @@
 import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { BetControls, PlayControls } from './components/ActionControls';
-import BlackjackTable from './components/BlackjackTable';
+import PokDengTable from './components/PokDengTable';
 import InviteCard from './components/InviteCard';
 import HowToPlay from './components/HowToPlay';
 import { RULES } from './components/rules';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
-import type { GameState, TableConfig } from './types/blackjack';
-import { createGame, isBroke, MAX_SEATS } from './engine/blackjackEngine';
-import { standProfitChance } from './engine/odds';
+import type { GameState, TableConfig } from './types/pokdeng';
+import { createGame, isBroke, MAX_SEATS } from './engine/pokDengEngine';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
@@ -24,11 +23,10 @@ function identity(name: string, watch = false): Identity {
     if (!v) sessionStorage.setItem(key, (v = randomHex(size)));
     return v;
   };
-  return { id: read('blackjack.id', 8), secret: read('blackjack.secret', 16), name, watch };
+  return { id: read('pokdeng.id', 8), secret: read('pokdeng.secret', 16), name, watch };
 }
 
 const MIN_BETS = [5, 10, 25, 100] as const;
-const DECKS = [1, 2, 6, 8] as const;
 
 /**
  * Browsers built into social apps (Instagram, Facebook/Messenger, LINE, Snapchat, TikTok, WeChat, Android app
@@ -49,7 +47,7 @@ function Segmented<T extends number>({ name, options, value, onChange }: { name:
       {options.map((o) => (
         <label key={o} className="relative">
           <input type="radio" name={name} value={o} checked={value === o} onChange={() => onChange(o)} className="peer sr-only" />
-          <span className="block cursor-pointer rounded-lg py-2 text-center font-mono text-sm font-medium text-slate-300 transition peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-blue-300 hover:text-slate-50 peer-checked:hover:text-slate-900">
+          <span className="block cursor-pointer rounded-lg py-2 text-center font-mono text-sm font-medium text-slate-300 transition peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-yellow-300 hover:text-slate-50 peer-checked:hover:text-slate-900">
             {o}
           </span>
         </label>
@@ -60,11 +58,10 @@ function Segmented<T extends number>({ name, options, value, onChange }: { name:
 
 export default function App() {
   const urlRoom = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
-  const [name, setName] = useState(() => localStorage.getItem('blackjack.name') ?? '');
+  const [name, setName] = useState(() => localStorage.getItem('pokdeng.name') ?? '');
   const [code, setCode] = useState(urlRoom);
   const [stack, setStack] = useState('1000');
   const [minBet, setMinBet] = useState<(typeof MIN_BETS)[number]>(10);
-  const [decks, setDecks] = useState<(typeof DECKS)[number]>(6);
   const [busy, setBusy] = useState<'join' | 'create' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -72,7 +69,7 @@ export default function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [status, setStatus] = useState<NetStatus>('connecting');
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
-  const [muted, setMuted] = useState(() => localStorage.getItem('blackjack.muted') === '1');
+  const [muted, setMuted] = useState(() => localStorage.getItem('pokdeng.muted') === '1');
   const [inAppHint, setInAppHint] = useState(() => IN_APP_BROWSER.test(navigator.userAgent));
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null); // host: first tap on Remove
   const { chime } = useAudio();
@@ -86,8 +83,8 @@ export default function App() {
     setNet(null);
     setGame(null);
     setNotice(message);
-    sessionStorage.removeItem('blackjack.room');
-    sessionStorage.removeItem('blackjack.watch');
+    sessionStorage.removeItem('pokdeng.room');
+    sessionStorage.removeItem('pokdeng.watch');
     history.replaceState(null, '', location.pathname);
   }, []);
 
@@ -101,8 +98,8 @@ export default function App() {
   const enter = (n: TableNet) => {
     netRef.current = n;
     setNet(n);
-    sessionStorage.setItem('blackjack.room', n.roomCode);
-    if (n.me.watch) sessionStorage.setItem('blackjack.watch', '1');
+    sessionStorage.setItem('pokdeng.room', n.roomCode);
+    if (n.me.watch) sessionStorage.setItem('pokdeng.watch', '1');
     history.replaceState(null, '', `?room=${n.roomCode}`);
   };
 
@@ -112,7 +109,7 @@ export default function App() {
       setNotice('Enter a display name first.');
       return null;
     }
-    localStorage.setItem('blackjack.name', trimmed);
+    localStorage.setItem('pokdeng.name', trimmed);
     return trimmed;
   };
 
@@ -123,7 +120,7 @@ export default function App() {
     const startingStack = Number(stack);
     if (!Number.isInteger(startingStack) || startingStack < minBet * 2)
       return setNotice(`The starting stack must be a whole number of at least ${minBet * 2} (two minimum bets).`);
-    const config: TableConfig = { startingStack, minBet, decks };
+    const config: TableConfig = { startingStack, minBet };
 
     setBusy('create');
     setNotice(null);
@@ -164,9 +161,9 @@ export default function App() {
 
   // Reload during a game: reconnect to the same room with the same identity.
   useEffect(() => {
-    const stored = localStorage.getItem('blackjack.name');
-    if (!autoJoined.current && urlRoom && stored && sessionStorage.getItem('blackjack.room') === urlRoom) {
-      void joinRoom(urlRoom, stored, sessionStorage.getItem('blackjack.watch') === '1');
+    const stored = localStorage.getItem('pokdeng.name');
+    if (!autoJoined.current && urlRoom && stored && sessionStorage.getItem('pokdeng.room') === urlRoom) {
+      void joinRoom(urlRoom, stored, sessionStorage.getItem('pokdeng.watch') === '1');
     }
     autoJoined.current = true;
     return () => netRef.current?.destroy();
@@ -175,10 +172,10 @@ export default function App() {
 
   const me = game && net ? game.players.find((p) => p.id === net.me.id) : undefined;
   const myTurn = !!game && !!me && game.phase === 'playing' && game.activeId === me.id;
-  const myBet = !!game && !!me && game.phase === 'betting' && me.hands.length === 0;
+  const myBet = !!game && !!me && game.phase === 'betting' && !me.bet;
 
   // Chime once when betting opens for us and once per decision.
-  const chimeKey = myTurn || myBet ? `${game!.round}-${game!.phase}-${game!.activeHand}` : null;
+  const chimeKey = myTurn || myBet ? `${game!.round}-${game!.phase}` : null;
   useEffect(() => {
     if (chimeKey && !muted) chime();
   }, [chimeKey, muted, chime]);
@@ -202,16 +199,16 @@ export default function App() {
   if (!net || !game) {
     const card = 'lobby-section';
     return (
-      <main className="lobby" style={{ '--accent': '#285a88', '--felt': '#193e60' } as import('react').CSSProperties}>
-        <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 02 / Blackjack</span></nav>
+      <main className="lobby" style={{ '--accent': '#8a6208', '--felt': '#6e5610' } as import('react').CSSProperties}>
+        <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 05 / Pok Deng</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="♣"><p className="edition">1–7 players · Against the house</p>
+            <header className="lobby-intro" data-mark="♦"><p className="edition">1–7 players · Against the dealer</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Blackjack <span className="text-blue-400">P2P</span>
+                Pok Deng <span className="text-yellow-400">P2P</span>
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
-                Blackjack with friends against the house, right in the browser. Virtual chips, no sign-up.
+                The Thai card game of eights and nines, with friends against the dealer. Virtual chips, no sign-up.
               </p>
             </header>
             <div>
@@ -283,11 +280,7 @@ export default function App() {
               <Segmented name="minBet" options={MIN_BETS} value={minBet} onChange={setMinBet} />
             </fieldset>
 
-            <fieldset className="mt-4">
-              <legend className={label}>Decks in the shoe</legend>
-              <Segmented name="decks" options={DECKS} value={decks} onChange={setDecks} />
-              <p className="mt-2 text-sm text-slate-400">Blackjack pays 3 to 2, the dealer stands on 17, and the shoe is reshuffled when three quarters are dealt.</p>
-            </fieldset>
+            <p className="mt-2 text-sm text-slate-400">One deck, shuffled every round. Deng can multiply a win or a loss up to 5 times the bet.</p>
 
             <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
               {busy === 'create' ? 'Creating room…' : 'Create room'}
@@ -304,14 +297,13 @@ export default function App() {
   const queuePos = game.queue.findIndex((q) => q.id === net.me.id);
   const watching = game.spectators.some((w) => w.id === net.me.id);
   const display = watching && isTournament(net.me.name);
-  const chances = watching ? standProfitChance(game) : {};
-  const broke = game.started && !watching && (!me || isBroke(game, me));
+    const broke = game.started && !watching && (!me || isBroke(game, me));
   const seated = game.players.length;
   const url = joinUrl(game.roomCode);
-  const statusColor = { hosting: 'bg-blue-400', connected: 'bg-blue-400', connecting: 'bg-amber-300', reconnecting: 'bg-rose-400' }[status];
+  const statusColor = { hosting: 'bg-yellow-400', connected: 'bg-yellow-400', connecting: 'bg-amber-300', reconnecting: 'bg-rose-400' }[status];
   const share = async () => {
     try {
-      if (navigator.share) await navigator.share({ title: 'Blackjack P2P', text: `Join my blackjack table ${game.roomCode}`, url });
+      if (navigator.share) await navigator.share({ title: 'Pok Deng P2P', text: `Join my Pok Deng table ${game.roomCode}`, url });
       else {
         await navigator.clipboard.writeText(url);
         setToast({ text: 'Invite link copied', error: false });
@@ -321,13 +313,13 @@ export default function App() {
     }
   };
   const toggleMute = () => {
-    localStorage.setItem('blackjack.muted', muted ? '0' : '1');
+    localStorage.setItem('pokdeng.muted', muted ? '0' : '1');
     setMuted(!muted);
   };
   const activeName = game.players.find((p) => p.id === game.activeId)?.name ?? 'another player';
 
   return (
-    <main className="table-room flex h-dvh flex-col overflow-hidden" style={{ '--accent': '#285a88', '--felt': '#193e60' } as import('react').CSSProperties}>
+    <main className="table-room flex h-dvh flex-col overflow-hidden" style={{ '--accent': '#8a6208', '--felt': '#6e5610' } as import('react').CSSProperties}>
       <header className="flex items-center gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 sm:px-5 sm:pt-3">
         <button onClick={() => inviteRef.current?.showModal()} className={`${button.quiet} min-h-10 px-3`}>
           <span className={`size-2 rounded-full ${statusColor}`} aria-hidden />
@@ -378,15 +370,15 @@ export default function App() {
       </header>
 
       <div className={`flex min-h-0 flex-1 ${display ? 'flex-col overflow-y-auto lg:flex-row lg:overflow-hidden' : ''}`}>
-        <section className={`relative flex-1 px-1 sm:px-4 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink lg:py-10' : 'min-h-0'}`} aria-label="Blackjack table">
-          <BlackjackTable state={game} heroId={net.me.id} chances={chances} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
+        <section className={`relative flex-1 px-1 sm:px-4 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink lg:py-10' : 'min-h-0'}`} aria-label="Pok Deng table">
+          <PokDengTable state={game} heroId={net.me.id} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
         </section>
-        {display && <Tournament state={game} url={url} chances={chances} />}
+        {display && <Tournament state={game} url={url} />}
       </div>
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
         {myTurn ? (
-          <PlayControls key={`${game.round}-${game.activeHand}-${game.deadline}`} state={game} heroId={net.me.id} onAction={(a) => net.act(a)} />
+          <PlayControls key={game.round} onAction={(a) => net.act(a)} />
         ) : myBet ? (
           <BetControls key={game.round} state={game} heroId={net.me.id} onAction={(a) => net.act(a)} />
         ) : isHost && !game.started ? (

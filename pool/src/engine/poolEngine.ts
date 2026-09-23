@@ -1,8 +1,12 @@
-import type { Ball, GameState, Group, PlayerAction, Side } from '../types/pool';
-import { clearPosition, R, simulate } from './physics';
+import type { Ball, GameState, Group, PlayerAction, Pocket, Side } from '../types/pool';
+import { clearPosition, DROPS, R, shotMs, simulate } from './physics';
 
 export const MAX_SEATS = 4;
 export const IDLE_MS = 5 * 60_000;
+/** Time for each shot or break decision, counted from when the balls stop. */
+export const SHOT_CLOCK_MS = 90_000;
+/** How far a bot's cue can stray, in radians either way. Raise it for a weaker bot, lower it for a stronger one. */
+const BOT_AIM_ERROR = 0.0025;
 export const isBot = (id: string) => /^bot:\d+$/.test(id);
 /** Visible rack outlook, not a calibrated probability: clearance and next shot only. */
 export function rackOutlook(s: GameState, side: Side): number {
@@ -33,7 +37,7 @@ export function createGame(roomCode: string, mode: GameState['mode'], raceTo: nu
   return { roomCode, mode, raceTo, started: false, phase: 'waiting', rack: 0, balls: [], players: [], queue: [], spectators: [],
     teams: [{ group: null, racks: 0, shots: 0 }, { group: null, racks: 0, shots: 0 }], turnTeam: 0, activeId: null,
     nextMember: [0, 0], breakShot: true, ballInHand: null, choice: null, winner: null, lastEvent: '', history: [],
-    turnStartedAt: now, lastActionAt: now };
+    lastShot: null, turnStartedAt: now, lastActionAt: now };
 }
 
 function seat(s: GameState, id: string, name: string) {
@@ -215,7 +219,10 @@ function playShot(s: GameState, action: Extract<PlayerAction, { type: 'shot' }>,
   const side = s.turnTeam, opponent = other(side);
   const beforeGroup = s.teams[side].group;
   const groupRemaining = beforeGroup ? s.balls.some((b) => groupOf(b.n) === beforeGroup) : true;
-  const shot = simulate(s.balls, angle, power, tipX, tipY);
+  // The host works out cos/sin once and shares them, so replays use the same numbers.
+  const dirX = Math.cos(angle), dirY = Math.sin(angle);
+  const shot = simulate(s.balls, { dirX, dirY, power, tipX, tipY });
+  s.lastShot = { id: (s.lastShot?.id ?? 0) + 1, balls: s.balls, dirX, dirY, power, tipX, tipY, ms: shotMs(shot.steps) };
   s.balls = shot.balls;
   s.teams[side].shots++;
   s.nextMember[side]++;
@@ -274,6 +281,7 @@ function playShot(s: GameState, action: Extract<PlayerAction, { type: 'shot' }>,
 }
 
 function act(s: GameState, id: string, action: PlayerAction, now: number) {
+  if (now < s.turnStartedAt) throw new Error('Wait for the balls to stop');
   if (action.type === 'nextRack') {
     if (s.phase !== 'between' || !s.players.some((p) => p.id === id)) throw new Error('Next rack is unavailable');
     return startRack(s, now);
@@ -292,48 +300,116 @@ function act(s: GameState, id: string, action: PlayerAction, now: number) {
     cue.x = action.x; cue.y = action.y;
     return;
   }
-  return playShot(s, action, now);
+  playShot(s, action, now);
+  s.turnStartedAt = now + s.lastShot!.ms; // the next turn and its shot clock start once the balls stop on screen
 }
 
 export function applyAction(state: GameState, id: string, action: PlayerAction, now: number): GameState {
   return update(state, (s) => { act(s, id, action, now); s.lastActionAt = now; });
 }
 
-/** Cheap ghost-ball bot: clear direct pot when possible, otherwise attempt the nearest legal ball. */
-export function botAction(s: GameState): PlayerAction {
-  const cue = s.balls.find((b) => b.n === 0)!;
-  if (s.breakShot) return { type: 'shot', angle: Math.atan2(250 - cue.y, 690 - cue.x), power: 100, tipX: 0, tipY: 0, ball: null, pocket: null, safety: false };
+type ShotAction = Extract<PlayerAction, { type: 'shot' }>;
+
+function legalTargets(s: GameState) {
   const group = s.teams[s.turnTeam].group;
-  const targets = s.balls.filter((b) => b.n > 0 && (group ? (s.balls.some((x) => groupOf(x.n) === group) ? groupOf(b.n) === group : b.n === 8) : b.n !== 8));
-  const pockets = [[0, 0], [500, 0], [1000, 0], [0, 500], [500, 500], [1000, 500]] as const;
-  let best: { angle: number; ball: number; pocket: number; cost: number } | null = null;
-  for (const target of targets) for (let p = 0; p < 6; p++) {
-    const [px, py] = pockets[p], tx = px - target.x, ty = py - target.y, td = Math.hypot(tx, ty);
-    const gx = target.x - tx / td * (2 * R + 1), gy = target.y - ty / td * (2 * R + 1);
-    const dx = gx - cue.x, dy = gy - cue.y, distance = Math.hypot(dx, dy);
-    if (!clearPosition(s.balls.filter((b) => b.n !== target.n), gx, gy, 0)) continue;
-    const obstructed = s.balls.some((b) => b.n !== 0 && b.n !== target.n && ((b.x - cue.x) * dx + (b.y - cue.y) * dy) / (distance * distance) > 0
-      && ((b.x - cue.x) * dx + (b.y - cue.y) * dy) / (distance * distance) < 1
-      && Math.abs((b.x - cue.x) * dy - (b.y - cue.y) * dx) / distance < 2 * R);
-    const cost = distance + td * 0.3 + (obstructed ? 500 : 0);
-    if (!best || cost < best.cost) best = { angle: Math.atan2(dy, dx), ball: target.n, pocket: p, cost };
+  return s.balls.filter((b) => b.n > 0 && (group ? (s.balls.some((x) => groupOf(x.n) === group) ? groupOf(b.n) === group : b.n === 8) : b.n !== 8));
+}
+
+/** No ball within a ball's width of the straight line from `from` to `to` (both of those are ignored). */
+function clearLine(balls: Ball[], from: Ball, to: Ball) {
+  const dx = to.x - from.x, dy = to.y - from.y, d2 = dx * dx + dy * dy;
+  return balls.every((b) => {
+    if (b.n === from.n || b.n === to.n) return true;
+    const t = ((b.x - from.x) * dx + (b.y - from.y) * dy) / d2;
+    return t <= 0 || t >= 1 || Math.abs((b.x - from.x) * dy - (b.y - from.y) * dx) / Math.sqrt(d2) >= 2 * R;
+  });
+}
+
+/**
+ * Bot: runs the most promising pots through the simulator and keeps one that goes in and leaves the cue ball a
+ * clear next shot. With no pot on, it plays a safety that hides the cue ball. It then misses its line by a hair,
+ * so it plays like a steady amateur rather than a machine.
+ * ponytail: centre-ball hits only; spin for position would make it stronger.
+ */
+export function botAction(s: GameState): ShotAction {
+  const cue = s.balls.find((b) => b.n === 0)!;
+  const wobble = (rad: number) => (Math.random() - 0.5) * 2 * rad;
+  const aim = (angle: number, power: number, call: Pick<ShotAction, 'ball' | 'pocket' | 'safety'>): ShotAction =>
+    ({ type: 'shot', angle: angle + wobble(BOT_AIM_ERROR), power, tipX: 0, tipY: 0, ...call });
+  if (s.breakShot) return aim(Math.atan2(250 + wobble(3) - cue.y, 690 - cue.x), 100, { ball: null, pocket: null, safety: false });
+
+  const targets = legalTargets(s);
+  const legalFirst = (n: number | null) => targets.some((t) => t.n === n);
+  const run = (angle: number, power: number) => simulate(s.balls, { dirX: Math.cos(angle), dirY: Math.sin(angle), power, tipX: 0, tipY: 0 });
+
+  const tries: { angle: number; power: number; ball: Ball; pocket: Pocket; cost: number }[] = [];
+  for (const ball of targets) for (let p = 0; p < DROPS.length; p++) {
+    const [px, py] = DROPS[p];
+    const tx = px - ball.x, ty = py - ball.y, td = Math.hypot(tx, ty);
+    const ghost = { n: ball.n, x: ball.x - (tx / td) * 2 * R, y: ball.y - (ty / td) * 2 * R };
+    const dx = ghost.x - cue.x, dy = ghost.y - cue.y, d = Math.hypot(dx, dy);
+    const cut = (dx * tx + dy * ty) / (d * td); // cosine of the cut angle
+    if (cut < 0.25 || !clearLine(s.balls, cue, ghost) || !clearLine(s.balls, ball, { n: -1, x: px, y: py })) continue;
+    tries.push({ angle: Math.atan2(dy, dx), power: Math.min(85, 12 + (d + td) / 20), ball, pocket: p as Pocket, cost: d + td + (1 - cut) * 400 });
   }
-  if (best) return { type: 'shot', angle: best.angle, power: Math.min(80, Math.max(35, best.cost / 12)), tipX: 0, tipY: 0,
-    ball: best.ball, pocket: best.pocket as 0 | 1 | 2 | 3 | 4 | 5, safety: false };
-  const target = targets[0] ?? s.balls.find((b) => b.n === 8)!;
-  return { type: 'shot', angle: Math.atan2(target.y - cue.y, target.x - cue.x), power: 55, tipX: 0, tipY: 0,
-    ball: target.n, pocket: 0, safety: false };
+  tries.sort((a, b) => a.cost - b.cost);
+  let best: { angle: number; power: number; ball: number; pocket: Pocket; score: number } | null = null;
+  for (const t of tries.slice(0, 10)) for (const power of [t.power, Math.min(100, t.power + 15)]) {
+    const r = run(t.angle, power);
+    if (!legalFirst(r.firstHit) || !r.pocketed.some((p) => p.n === t.ball.n && p.pocket === t.pocket)) continue;
+    if (r.pocketed.some((p) => p.n === 0 || (p.n === 8 && t.ball.n !== 8))) continue;
+    const group = s.teams[s.turnTeam].group ?? groupOf(t.ball.n);
+    const left = r.balls.filter((b) => groupOf(b.n) === group);
+    const next = r.balls.find((b) => b.n === 0)!;
+    const open = (left.length ? left : r.balls.filter((b) => b.n === 8)).filter((b) => clearLine(r.balls, next, b)).length;
+    const score = 10 * open - power / 10;
+    if (!best || score > best.score) best = { angle: t.angle, power, ball: t.ball.n, pocket: t.pocket, score };
+  }
+  if (best) return aim(best.angle, best.power, { ball: best.ball, pocket: best.pocket, safety: false });
+
+  let safe: { angle: number; power: number; score: number } | null = null;
+  for (const ball of targets) for (const power of [20, 35]) {
+    const angle = Math.atan2(ball.y - cue.y, ball.x - cue.x);
+    const r = run(angle, power);
+    const next = r.balls.find((b) => b.n === 0);
+    const foul = !next || !legalFirst(r.firstHit) || r.pocketed.some((p) => p.n === 8) || (!r.railAfter && !r.pocketed.length);
+    const score = (foul ? -100 : 0) - (next ? r.balls.filter((b) => b.n > 0 && clearLine(r.balls, next, b)).length : 0);
+    if (!safe || score > safe.score) safe = { angle, power, score };
+  }
+  const fallback = s.balls.find((b) => b.n > 0)!;
+  return safe ? aim(safe.angle, safe.power, { ball: null, pocket: null, safety: true })
+    : aim(Math.atan2(fallback.y - cue.y, fallback.x - cue.x), 35, { ball: null, pocket: null, safety: true });
+}
+
+/** Shot clock ran out: a break decision takes its default; a shot is a foul, with ball in hand for the other team. */
+function timeOut(s: GameState, now: number) {
+  const name = s.players.find((p) => p.id === s.activeId)?.name ?? 'Player';
+  if (s.phase === 'choice') {
+    const type = s.choice!.type;
+    choose(s, { type: 'choice', option: type === 'foul' ? 'head' : type === 'illegal' ? 'accept' : 'spot' }, now);
+    note(s, `${name} ran out of time. ${s.lastEvent}`);
+    return;
+  }
+  const side = s.turnTeam;
+  s.nextMember[side]++;
+  turn(s, other(side), now);
+  cueInHand(s, s.breakShot ? 'head' : 'any');
+  note(s, `${name} ran out of time. The other side has ball in hand${s.breakShot ? ' to break' : ''}.`);
 }
 
 export function hostTick(state: GameState, now: number): GameState {
   if (state.phase === 'between' && now - state.turnStartedAt > 6000 && ready(state)) return update(state, (s) => startRack(s, now));
-  if (state.activeId && isBot(state.activeId) && now - state.turnStartedAt > 900) {
+  if (!state.activeId || now < state.turnStartedAt) return state;
+  // Bot moves and timeouts don't count as room activity.
+  if (isBot(state.activeId) && now - state.turnStartedAt > 900) {
     if (state.phase === 'choice') {
       const type = state.choice!.type;
       const option = type === 'illegal' ? 'rebreak-self' : type === 'foul' ? 'head' : 'spot';
       return update(state, (s) => act(s, s.activeId!, { type: 'choice', option }, now));
     }
-    if (state.phase === 'aiming') return update(state, (s) => act(s, s.activeId!, botAction(s), now)); // bot ticks do not reset room idle time
+    if (state.phase === 'aiming') return update(state, (s) => act(s, s.activeId!, botAction(s), now));
   }
+  if (!isBot(state.activeId) && (state.phase === 'aiming' || state.phase === 'choice') && now - state.turnStartedAt > SHOT_CLOCK_MS)
+    return update(state, (s) => timeOut(s, now));
   return state;
 }

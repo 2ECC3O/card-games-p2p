@@ -36,7 +36,8 @@ button:disabled { cursor: not-allowed; }
 .pool-room { min-height: 100dvh; background: #10231b; color: #f4f0df; }
 .pool-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px max(2vw, 12px); border-bottom: 1px solid #ffffff24; background: #142a21; }
 .pool-header button { min-height: 42px; padding: 7px 11px; }
-.pool-header-center { color: #c6d4c7; font-size: 13px; white-space: nowrap; }
+.pool-header-center { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #c6d4c7; font-size: 13px; white-space: nowrap; }
+.pool-header button { flex-shrink: 0; white-space: nowrap; }
 .pool-header-center span { color: #6f9479; padding-inline: 4px; }
 .pool-status { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #f2bd70; }
 .pool-status[data-state=hosting], .pool-status[data-state=connected] { background: #7acb8e; }
@@ -65,9 +66,19 @@ button:disabled { cursor: not-allowed; }
 .pool-fine span { color: #c2d4c1; font-size: 12px; margin-right: auto; }
 .pool-fine button { border: 1px solid #829d7d; background: #2d543e; color: white; border-radius: 6px; padding: 7px; min-width: 43px; min-height: 38px; }
 .pool-fine button:hover, .pool-fine button:focus-visible { background: #416d50; }
-.pool-spin { display: flex; align-items: center; gap: 8px; }
-.pool-spin label { min-width: 95px; font-size: 12px; color: #c2d4c1; }
-.pool-control-block > .room-quiet { min-height: 36px; padding: 5px 10px; }
+.pool-clock { display: inline-block; margin-left: 10px; padding: 1px 9px; border-radius: 999px; background: #0d1d16; color: #f0d191; font: 700 13px "Courier New", monospace; }
+.pool-clock.is-low { color: #ff9a8a; }
+.pool-tip { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pool-tip-label { align-self: stretch; font-size: 13px; font-weight: 700; }
+.pool-tip strong { font-size: 13px; color: #f5d899; }
+.pool-tip-ball, .pool-tip-grid { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ebe6d2 65%, #c7c0a4); box-shadow: 0 4px 12px #0007; }
+.pool-tip-ball { position: relative; width: 76px; height: 76px; border: 0; cursor: pointer; }
+.pool-tip-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #c0392b; box-shadow: 0 0 0 2px #fff8; }
+.pool-tip-grid { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); place-items: center; width: 168px; height: 168px; }
+.pool-tip-grid button { width: 40px; height: 40px; border: 2px dashed #8f866c; border-radius: 50%; background: transparent; cursor: pointer; }
+.pool-tip-grid button:hover { background: #c0392b33; }
+.pool-tip-grid button[aria-pressed=true] { border: 3px solid #fff; background: #c0392b; }
+.pool-tip-ball:focus-visible, .pool-tip-grid button:focus-visible { outline: 3px solid #f0d191; outline-offset: 3px; }
 .pool-call { display: flex; align-items: end; gap: 10px; margin-top: 14px; }
 .pool-call > label { flex: 1; min-width: 0; font-size: 12px; color: #d1decf; }
 .pool-call select { width: 100%; margin-top: 4px; }

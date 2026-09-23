@@ -34,9 +34,9 @@ repository root publishes both games to Pages on every push to `main`.
 
 ## How to play
 
-- **Betting:** every round opens with a 15-second betting window. Pick an amount with the slider (or Min,
+- **Betting:** every round opens with a 30-second betting window. Pick an amount with the slider (or Min,
   ×2, Max) and press **Bet**. Anyone who doesn't bet in time sits the round out.
-- **Your turn:** players act in seat order, left to right, with 20 seconds per decision (then you stand).
+- **Your turn:** players act in seat order, left to right, with 60 seconds per decision (then you stand).
   - **Hit** takes a card, **Stand** keeps your total.
   - **Double** doubles your bet on your first two cards and takes exactly one more card.
   - **Split** turns a pair (any two 10-value cards count) into two hands with equal bets, up to four hands.

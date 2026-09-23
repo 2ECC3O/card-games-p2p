@@ -33,7 +33,7 @@ the [Hold'em README](../poker/README.md).
 
 ## How to play
 
-- **Betting:** every round opens with a 25-second betting window. Pick a chip (1, 5, 25 or 100 minimum
+- **Betting:** every round opens with a 60-second betting window. Pick a chip (1, 5, 25 or 100 minimum
   bets) and tap the board to place it; tap again to add more. Bet on as many spots as you like.
   **Clear** takes your chips back, **Repeat** puts last round's bets down again.
 - Press **Done betting** (**Spin** when you play alone) once you're set. The wheel spins when everyone is
