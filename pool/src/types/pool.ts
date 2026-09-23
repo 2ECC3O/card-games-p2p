@@ -31,6 +31,8 @@ export interface GameState {
   lastEvent: string;
   history: string[];
   lastShot: LastShot | null;
+  /** A bot's chosen shot, shown to everyone for a moment before it plays. */
+  botShot: { by: string; at: number; action: Extract<PlayerAction, { type: 'shot' }> } | null;
   /** When the balls stop and the shot clock starts. */
   turnStartedAt: number;
   lastActionAt: number;

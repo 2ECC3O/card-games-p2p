@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { addPlayer, applyAction, botAction, createGame, hostTick, removePlayer, SHOT_CLOCK_MS, startGame } from './poolEngine';
+import { addPlayer, applyAction, BOT_AIM_MS, botAction, createGame, hostTick, removePlayer, SHOT_CLOCK_MS, startGame } from './poolEngine';
 import { FRAME_EVERY, preview, R, simulate, type Shot } from './physics';
 import type { Ball, GameState } from '../types/pool';
 
@@ -80,7 +80,18 @@ assert.equal(game.teams[0].shots, 1);
 game = removePlayer(game, 'bob', after(game));
 assert.equal(game.players.length, 4);
 assert.ok(game.players.some((p) => p.team === 1 && p.id.startsWith('bot:')));
-for (let i = 0, time = after(game); i < 20 && game.phase !== 'finished'; i++, time = after(game) + 1000) game = hostTick(game, time);
+// A bot lines up first, so everyone can see its aim and power, and shoots only after BOT_AIM_MS.
+{
+  const bot = game.activeId!;
+  let s = hostTick(game, after(game) + 1000);
+  assert.equal(s.botShot?.by, bot, 'the bot shows its shot');
+  assert.equal(s.lastShot?.id, game.lastShot?.id, "and hasn't played it yet");
+  assert.equal(hostTick(s, after(game) + 1000 + BOT_AIM_MS - 1), s, 'still lining up');
+  s = hostTick(s, after(game) + 1000 + BOT_AIM_MS);
+  assert.equal(s.lastShot?.id, (game.lastShot?.id ?? 0) + 1, 'then it shoots');
+  assert.equal(s.botShot, null);
+}
+for (let i = 0, time = after(game) + 1000; i < 40 && game.phase !== 'finished'; i++, time = (game.botShot ? game.botShot.at + BOT_AIM_MS : after(game) + 1000)) game = hostTick(game, time);
 assert.ok(game.players.length === 4);
 
 // Scotch doubles: a continuing turn passes to the teammate.
@@ -100,7 +111,10 @@ assert.ok(!doubles.balls.some((b) => b.n === 1));
 {
   const s = structuredClone(doubles);
   s.balls = [{ n: 0, x: 300, y: 300 }, { n: 2, x: 150, y: 150 }, { n: 8, x: 700, y: 400 }, { n: 12, x: 800, y: 100 }];
+  const random = Math.random;
+  Math.random = () => 0.5; // no wobble: the bot's own choice, played straight
   const shot = botAction(s);
+  Math.random = random;
   assert.deepEqual([shot.ball, shot.pocket, shot.safety], [2, 0, false]);
   const played = applyAction(s, 'amy', shot, after(s));
   assert.ok(!played.balls.some((b) => b.n === 2), 'bot pots the 2');

@@ -36,11 +36,16 @@ interface Props {
   onPlace: (x: number, y: number) => void;
   onCallBall: (n: number) => void;
   onCallPocket: (n: Pocket) => void;
+  /** Someone else's shot to show while they line it up (a bot, before it plays). */
+  watching?: { angle: number; power: number; tipX: number; tipY: number } | null;
 }
 
-export default function PoolTable({ state, balls, angle, power, tipX, tipY, active, placing, calledBall, calledPocket, onAim, onPlace, onCallBall, onCallPocket }: Props) {
+export default function PoolTable({ state, balls, active, placing, calledBall, calledPocket, onAim, onPlace, onCallBall, onCallPocket, watching, ...mine }: Props) {
   const cue = balls.find((b) => b.n === 0);
-  const aiming = active && !placing && !!cue;
+  // Your own aim on your turn; otherwise the shot someone else is lining up, if any.
+  const shown = active ? (placing ? null : mine) : (watching ?? null);
+  const aiming = !!shown && !!cue;
+  const { angle, power, tipX, tipY } = shown ?? mine;
   // The same physics the host runs, so the line shows where this shot really goes (up to first contact and a little after).
   const guide = useMemo(
     () => (aiming ? preview(balls, { dirX: Math.cos(angle), dirY: Math.sin(angle), power, tipX, tipY }) : null),

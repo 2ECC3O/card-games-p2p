@@ -5,8 +5,12 @@ export const MAX_SEATS = 4;
 export const IDLE_MS = 5 * 60_000;
 /** Time for each shot or break decision, counted from when the balls stop. */
 export const SHOT_CLOCK_MS = 90_000;
-/** How far a bot's cue can stray, in radians either way. Raise it for a weaker bot, lower it for a stronger one. */
-const BOT_AIM_ERROR = 0.0025;
+/** How far a bot's cue can stray, in radians either way (0.01 ≈ 0.6°). Raise it for a weaker bot, lower it for a stronger one. */
+const BOT_AIM_ERROR = 0.01;
+/** How far a bot's power can stray, as a share of the power it meant. */
+const BOT_POWER_ERROR = 0.15;
+/** How long everyone sees a bot's aim and power before it shoots. */
+export const BOT_AIM_MS = 2_500;
 export const isBot = (id: string) => /^bot:\d+$/.test(id);
 /** Visible rack outlook, not a calibrated probability: clearance and next shot only. */
 export function rackOutlook(s: GameState, side: Side): number {
@@ -37,7 +41,7 @@ export function createGame(roomCode: string, mode: GameState['mode'], raceTo: nu
   return { roomCode, mode, raceTo, started: false, phase: 'waiting', rack: 0, balls: [], players: [], queue: [], spectators: [],
     teams: [{ group: null, racks: 0, shots: 0 }, { group: null, racks: 0, shots: 0 }], turnTeam: 0, activeId: null,
     nextMember: [0, 0], breakShot: true, ballInHand: null, choice: null, winner: null, lastEvent: '', history: [],
-    lastShot: null, turnStartedAt: now, lastActionAt: now };
+    lastShot: null, botShot: null, turnStartedAt: now, lastActionAt: now };
 }
 
 function seat(s: GameState, id: string, name: string) {
@@ -335,8 +339,8 @@ export function botAction(s: GameState): ShotAction {
   const cue = s.balls.find((b) => b.n === 0)!;
   const wobble = (rad: number) => (Math.random() - 0.5) * 2 * rad;
   const aim = (angle: number, power: number, call: Pick<ShotAction, 'ball' | 'pocket' | 'safety'>): ShotAction =>
-    ({ type: 'shot', angle: angle + wobble(BOT_AIM_ERROR), power, tipX: 0, tipY: 0, ...call });
-  if (s.breakShot) return aim(Math.atan2(250 + wobble(3) - cue.y, 690 - cue.x), 100, { ball: null, pocket: null, safety: false });
+    ({ type: 'shot', angle: angle + wobble(BOT_AIM_ERROR), power: Math.max(1, Math.min(100, Math.round(power * (1 + wobble(BOT_POWER_ERROR))))), tipX: 0, tipY: 0, ...call });
+  if (s.breakShot) return { type: 'shot', angle: Math.atan2(250 + wobble(3) - cue.y, 690 - cue.x), power: 100, tipX: 0, tipY: 0, ball: null, pocket: null, safety: false };
 
   const targets = legalTargets(s);
   const legalFirst = (n: number | null) => targets.some((t) => t.n === n);
@@ -407,7 +411,15 @@ export function hostTick(state: GameState, now: number): GameState {
       const option = type === 'illegal' ? 'rebreak-self' : type === 'foul' ? 'head' : 'spot';
       return update(state, (s) => act(s, s.activeId!, { type: 'choice', option }, now));
     }
-    if (state.phase === 'aiming') return update(state, (s) => act(s, s.activeId!, botAction(s), now));
+    if (state.phase === 'aiming') {
+      // First the bot lines up, so everyone can see its aim and power; then it shoots.
+      const planned = state.botShot?.by === state.activeId ? state.botShot : null;
+      if (!planned) return update(state, (s) => void (s.botShot = { by: s.activeId!, at: now, action: botAction(s) }));
+      if (now - planned.at >= BOT_AIM_MS) return update(state, (s) => {
+        s.botShot = null;
+        act(s, s.activeId!, planned.action, now);
+      });
+    }
   }
   if (!isBot(state.activeId) && (state.phase === 'aiming' || state.phase === 'choice') && now - state.turnStartedAt > SHOT_CLOCK_MS)
     return update(state, (s) => timeOut(s, now));

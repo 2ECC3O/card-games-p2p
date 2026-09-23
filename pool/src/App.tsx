@@ -183,6 +183,7 @@ export default function App() {
   const active = game.phase === 'aiming' && game.activeId === net.me.id && !rolling;
   const deciding = game.phase === 'choice' && game.activeId === net.me.id && !rolling;
   const clock = !rolling && (game.phase === 'aiming' || game.phase === 'choice') && !!game.activeId && !isBot(game.activeId);
+  const botAim = !rolling && game.phase === 'aiming' && game.botShot?.by === game.activeId ? game.botShot.action : null;
   const tipName = TIPS.find((t) => t.x === tipX && t.y === tipY)?.name ?? 'Centre';
   const isHost = net.role === 'host';
   const cue = game.balls.find((b) => b.n === 0);
@@ -204,9 +205,10 @@ export default function App() {
       <button className={button.quiet} onClick={() => { net.leave(); netRef.current = null; leaveHome(); }}>Leave</button></header>
     <div className={`pool-room-body ${display ? 'pool-display' : ''}`}><section className="pool-main" aria-label="Pool table and cue controls">
       <div className="pool-scorebar"><div><strong>{labelTeam(0)}</strong><span>{watching ? `${rackOutlook(game, 0)}% outlook` : game.teams[0].group ?? 'Open'}</span></div><b>{game.teams[0].racks} : {game.teams[1].racks}</b><div><strong>{labelTeam(1)}</strong><span>{watching ? `${rackOutlook(game, 1)}% outlook` : game.teams[1].group ?? 'Open'}</span></div></div>
-      <PoolTable state={game} balls={replay ?? game.balls} angle={angle} power={power} tipX={tipX} tipY={tipY} active={active} placing={placing} calledBall={calledBall} calledPocket={calledPocket}
+      <PoolTable state={game} balls={replay ?? game.balls} watching={botAim} angle={angle} power={power} tipX={tipX} tipY={tipY} active={active} placing={placing} calledBall={calledBall} calledPocket={calledPocket}
         onAim={setAngle} onPlace={(x, y) => { net.act({ type: 'place', x, y }); setPlacing(false); }} onCallBall={setCalledBall} onCallPocket={setCalledPocket} />
       <p className="pool-event" aria-live="polite">{game.phase === 'finished' ? `${labelTeam(game.winner!)} wins the match!` : game.lastEvent || 'Waiting to start.'}{clock && <ShotClock key={game.turnStartedAt} start={game.turnStartedAt} />}</p>
+      {botAim && <p className="pool-event pool-bot-aim" aria-live="polite">{current} lines up {botAim.safety ? 'a safety' : botAim.ball !== null ? `the ${botAim.ball} to the ${pocketNames[botAim.pocket!].toLowerCase()} pocket` : 'the break'} · power {botAim.power}%</p>}
       {active && <div className="pool-controls">
         <div className="pool-controls-top"><strong>Your shot</strong><span>{game.breakShot ? 'Break · no call needed' : `${current} · ${group ?? 'open table'}`}</span></div>
         <div className="pool-control-grid"><div className="pool-control-block"><label htmlFor="pool-power">Power <b>{power}%</b></label><input id="pool-power" type="range" min="1" max="100" value={power} onChange={(e) => setPower(Number(e.target.value))} />
