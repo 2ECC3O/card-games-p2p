@@ -115,11 +115,10 @@ function rackBalls(): Ball[] {
   const random = (n: number) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
   const solids = [1, 2, 3, 4, 5, 6, 7], stripes = [9, 10, 11, 12, 13, 14, 15];
   for (const set of [solids, stripes]) for (let i = set.length - 1; i > 0; i--) { const j = random(i + 1); [set[i], set[j]] = [set[j], set[i]]; }
-  const numbers = [...solids.slice(1), ...stripes.slice(1), solids[0], stripes[0], 8];
-  for (let i = numbers.length - 1; i > 0; i--) { const j = random(i + 1); [numbers[i], numbers[j]] = [numbers[j], numbers[i]]; }
-  numbers.splice(numbers.indexOf(8), 1); numbers.splice(4, 0, 8);
-  numbers.splice(numbers.indexOf(solids[0]), 1); numbers.splice(10, 0, solids[0]);
-  numbers.splice(numbers.indexOf(stripes[0]), 1); numbers.splice(14, 0, stripes[0]);
+  const rest = [...solids.slice(1), ...stripes.slice(1)];
+  for (let i = rest.length - 1; i > 0; i--) { const j = random(i + 1); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  // The 8 in the middle of the third row, a solid and a stripe in the back corners, the rest shuffled.
+  const numbers = Array.from({ length: 15 }, (_, i) => (i === 4 ? 8 : i === 10 ? solids[0] : i === 14 ? stripes[0] : rest.pop()!));
   let index = 0;
   for (let row = 0; row < 5; row++) for (let col = 0; col <= row; col++)
     balls.push({ n: numbers[index++], x: 690 + row * (2 * R + 0.2), y: 250 + (col - row / 2) * (2 * R + 0.2) });

@@ -51,7 +51,11 @@ game = addPlayer(game, 'bob', 'Bob', 0);
 game = startGame(game, 0);
 assert.deepEqual(game.players.map((p) => p.team), [0, 1, 0, 1]);
 assert.equal(game.balls.length, 16);
-assert.equal(game.balls.find((b) => b.n === 8)?.x, 690 + 2 * (23 + .2));
+// The 8 always racks in the middle of the third row, whatever the shuffle.
+for (let i = 0; i < 50; i++) {
+  const rack8 = startGame(addPlayer(createGame('R', 'singles', 1, 0), 'a', 'A', 0), 0).balls.find((b) => b.n === 8)!;
+  assert.deepEqual([rack8.x, rack8.y], [690 + 2 * (23 + .2), 250]);
+}
 assert.equal(game.activeId, 'alice');
 assert.equal(game.ballInHand, 'head');
 assert.equal(game.players.filter((p) => p.id.startsWith('bot:')).length, 2);
