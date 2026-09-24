@@ -343,7 +343,7 @@ export default function App() {
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">
         {me && (game.phase === 'playing' || game.phase === 'exchange') && me.hand.length > 0 ? (
-          <HandControls state={game} heroId={net.me.id} onAction={(a) => net.act(a)} status={game.phase === 'exchange' ? 'Card exchange…' : `Waiting for ${activeName}…`} />
+          <HandControls state={game} heroId={net.me.id} onAction={(a) => net.act(a)} status={game.phase === 'exchange' ? 'Card exchange: the Slave and Serf pass their best cards up to the King and Queen. Citizens keep their cards.' : `Waiting for ${activeName}…`} />
         ) : isHost && !game.started ? (
           <div className="mx-auto flex max-w-2xl gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
             <button disabled={seated < 1} onClick={() => net.startGame()} className={`${button.primary} min-h-12 flex-1 text-base sm:min-h-14 sm:text-lg`}>

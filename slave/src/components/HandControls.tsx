@@ -16,16 +16,17 @@ interface Props {
 export default function HandControls({ state, heroId, onAction, status }: Props) {
   const me = state.players.find((p) => p.id === heroId)!;
   const [picked, setPicked] = useState<Card[]>([]);
-  // One send per decision: a double tap would otherwise play into the next player's turn.
-  const decision = `${state.round}-${state.phase}-${state.activeId}-${state.pile?.cards.join()}-${state.passed.length}`;
-  const [sent, setSent] = useState<string | null>(null);
+  // One send per state: a double tap would otherwise play into the next player's turn. Any new state from the host
+  // unlocks, so leading twice in a round (same empty pile, same turn) never looks like the move already sent.
+  const [sentOn, setSentOn] = useState<GameState | null>(null);
+  const sent = sentOn === state;
   const chosen = picked.filter((c) => me.hand.includes(c));
   const give = state.phase === 'exchange' ? state.gives.find((g) => g.from === heroId && !g.cards.length) : undefined;
   const myTurn = state.phase === 'playing' && state.activeId === heroId;
   const pile = state.pile?.cards ?? null;
-  const ready = sent !== decision && (give ? chosen.length === give.count : myTurn && beats(chosen, pile));
+  const ready = !sent && (give ? chosen.length === give.count : myTurn && beats(chosen, pile));
   const send = (action: PlayerAction) => {
-    setSent(decision);
+    setSentOn(state);
     setPicked([]);
     onAction(action);
   };
@@ -74,7 +75,7 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
         ) : (
           myTurn && (
             <>
-              <button disabled={!pile || sent === decision} onClick={() => send({ type: 'pass' })} className={`${button.quiet} min-h-12 px-5 text-base`}>
+              <button disabled={!pile || sent} onClick={() => send({ type: 'pass' })} className={`${button.quiet} min-h-12 px-5 text-base`}>
                 Pass
               </button>
               <button disabled={!ready} onClick={() => send({ type: 'play', cards: chosen })} className={`${button.primary} min-h-12 px-6 text-base`}>
