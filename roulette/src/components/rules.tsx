@@ -13,7 +13,7 @@ export const RULES: Page[] = [
   {
     title: 'Guess where the ball lands',
     picture: <div className="htp-row"><Pocket n={0} color="green" /><Pocket n={32} color="red" /><Pocket n={15} color="black" /><Pocket n={19} color="red" /></div>,
-    text: <>The wheel has <b>37 pockets</b>: 1 to 36 in red and black, plus a green 0. Bet on where the ball stops.</>,
+    text: <>The wheel has <b>37 pockets</b>: 1 to 36 in red and black, plus a green 0. A double-zero table adds a green <b>00</b>, for 38. Bet on where the ball stops.</>,
   },
   {
     title: 'Put chips on the board',
@@ -39,6 +39,6 @@ export const RULES: Page[] = [
   {
     title: 'Watch out for zero',
     picture: <Pocket n={0} color="green" />,
-    text: <>When the ball lands on <b>0</b>, every bet loses except a bet on 0 itself. Out of chips? Press <b>Rejoin</b>.</>,
+    text: <>When the ball lands on <b>0</b> (or <b>00</b>), every bet loses except a bet on that number itself. Out of chips? Press <b>Rejoin</b>.</>,
   },
 ];

@@ -13,7 +13,7 @@ Poker, blackjack, roulette, eight-ball pool, Pok Deng and Slave you play with fr
 | Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
 | Eight-ball pool | 1 to 4, with bots | the other team | [play](https://2ecc3o.github.io/card-games-p2p/pool/) |
 | Pok Deng | 1 to 7, with bots | whoever deals this round (it rotates; alone, the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/pokdeng/) |
-| Slave (สลาฟ) | 1 to 8, with bots | each other, for King (fewer than 4 fills with bots) | [play](https://2ecc3o.github.io/card-games-p2p/slave/) |
+| Slave | 1 to 8, with bots | each other, for King (fewer than 4 fills with bots) | [play](https://2ecc3o.github.io/card-games-p2p/slave/) |
 
 ## Start a game in a minute
 
@@ -32,7 +32,7 @@ Type **TOURNAMENT** as the display name when creating or joining a room. That br
 
 Poker spectators and the TOURNAMENT display also see each active hand's **win chance**. Before the river, it is estimated from random runouts; on the completed board, it is exact. Ties split the chance. The display keeps the separate **past hand win rate**: completed hands won (a split pot counts as a win for each winner) divided by completed hands dealt. The count survives a rebuy in the same room. The feed is kept in the display browser and starts fresh if that page reloads.
 
-Blackjack spectators see the estimated chance a player's current hands return a net profit if stood now. Roulette spectators see the exact chance their current bets return a net profit across 37 pockets. In a bot match, a bot that cannot afford the minimum leaves, and the last funded seat wins; a solo blackjack, roulette or Pok Deng room without bots still runs normal rounds. This display does not run brackets or cross-room scores. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
+Blackjack spectators see the estimated chance a player's current hands return a net profit if stood now. Roulette spectators see the exact chance their current bets return a net profit across every pocket (37, or 38 on a double-zero table). In a bot match, a bot that cannot afford the minimum leaves, and the last funded seat wins; a solo blackjack, roulette or Pok Deng room without bots still runs normal rounds. This display does not run brackets or cross-room scores. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
 
 Slave has no chips: the TOURNAMENT display ranks players by points (finishing k-th of n earns n − k) and shows each title and cards left. Slave spectators and the display also see each seat's estimated chance to end the round King (until someone is out), then Slave, from 200 simulated playouts of the cards on the table.
 
@@ -82,7 +82,7 @@ Each game's own README has the full rules and details:
 | `roulette/` | the roulette app, same stack and design |
 | `pool/` | eight-ball pool, same peer-to-peer room pattern |
 | `pokdeng/` | Pok Deng, a copy of blackjack's app with its own engine, in yellow |
-| `slave/` | Slave (สลาฟ), a copy of Pok Deng's app with its own engine, in plum |
+| `slave/` | Slave, a copy of Pok Deng's app with its own engine, in plum |
 | `index.html` | the game picker page at the root of the site |
 | `.github/workflows/deploy.yml` | tests, builds and publishes everything |
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  addBot, addPlayer, addSpectator, applyAction, BET_MS, createGame, hostTick, isBroke, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, staked, startGame, WHEEL,
+  addBot, addPlayer, addSpectator, AMERICAN_WHEEL, applyAction, BET_MS, createGame, DOUBLE_ZERO, hostTick, isBroke, numberLabel, payoutMultiple, rejoinQueue, removePlayer, RED, SPIN_MS, SETTLE_MS, spin, staked, startGame, WHEEL,
 } from './rouletteEngine';
 import { profitChance } from './odds';
 import type { GameState, PlayerAction, Spot } from '../types/roulette';
@@ -153,5 +153,31 @@ s = act(s, 'p0', { type: 'done' });
 assert.equal(s.round, 2, 'the spectator does not hold up the round');
 s = addPlayer(s, 'w', 'Watcher', 2);
 assert.deepEqual([s.spectators.length, s.queue[0]?.id], [0, 'w'], 'a spectator who joins to play queues for a seat');
+
+// ------------------------------------------------ double zero
+assert.deepEqual([...AMERICAN_WHEEL].sort((a, b) => a - b), Array.from({ length: 38 }, (_, i) => i), 'American wheel: every number once, 37 standing for 00');
+for (let i = 1; i < AMERICAN_WHEEL.length; i++) {
+  const [a, b] = [AMERICAN_WHEEL[i - 1], AMERICAN_WHEEL[i]];
+  if (a && b && a !== DOUBLE_ZERO && b !== DOUBLE_ZERO) assert.notEqual(RED.has(a), RED.has(b), `${a} and ${b} alternate colours`);
+}
+assert.equal(numberLabel(DOUBLE_ZERO), '00');
+assert.equal(payoutMultiple(`n${DOUBLE_ZERO}`, DOUBLE_ZERO), 36, '00 straight up pays 35 to 1');
+assert.equal(payoutMultiple('n0', DOUBLE_ZERO), 0);
+for (const spot of ['red', 'black', 'odd', 'even', 'low', 'high', 'd1', 'c1'] as Spot[]) assert.equal(payoutMultiple(spot, DOUBLE_ZERO), 0, `00 loses ${spot}`);
+assert.throws(() => act(table(1), 'p0', { type: 'bet', spot: `n${DOUBLE_ZERO}`, amount: 10 }), /Invalid bet/, 'no 00 on a single-zero table');
+let american = createGame('ROOM00', { ...config, doubleZero: true }, 0);
+american = addPlayer(american, 'a', 'Ann', 0);
+american = startGame(american, 0);
+american = act(american, 'a', { type: 'bet', spot: `n${DOUBLE_ZERO}`, amount: 10 });
+assert.equal(profitChance(american).a, 1 / 38, 'one pocket in 38');
+const spun = new Set<number>();
+for (let i = 0; i < 2000; i++) {
+  const s = structuredClone(american);
+  spin(s, 0);
+  spun.add(s.result!);
+}
+assert.equal(spun.size, 38, 'every pocket comes up, 00 included');
+spin(american, 0, DOUBLE_ZERO);
+assert.equal(american.players[0].payout, 360);
 
 console.log('engine: all checks passed');

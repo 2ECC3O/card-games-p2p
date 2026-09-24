@@ -186,7 +186,7 @@ export default function App() {
                 Slave <span className="text-yellow-400">P2P</span>
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
-                สลาฟ, the Thai climbing game. Empty your hand first to be King; come last and you're the Slave. No sign-up.
+                Slave, the Thai climbing game. Empty your hand first to be King; come last and you're the Slave. No sign-up.
               </p>
             </header>
             <div>

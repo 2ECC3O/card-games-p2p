@@ -1,14 +1,14 @@
-import { RED, SPIN_MS, staked } from '../engine/rouletteEngine';
+import { numberLabel, SPIN_MS, staked } from '../engine/rouletteEngine';
 import { profitChance } from '../engine/odds';
 import type { GameState, Spot } from '../types/roulette';
-import { playerColor, useLanded } from './RouletteTable';
+import { playerColor, resultName, useLanded } from './RouletteTable';
 import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
 
 const SPOT_NAME: Record<string, string> = {
   red: 'red', black: 'black', odd: 'odd', even: 'even', low: '1–18', high: '19–36',
   d1: 'the 1st dozen', d2: 'the 2nd dozen', d3: 'the 3rd dozen', c1: 'column 1', c2: 'column 2', c3: 'column 3',
 };
-const spotName = (spot: string) => (spot[0] === 'n' ? spot.slice(1) : SPOT_NAME[spot]);
+const spotName = (spot: string) => (spot[0] === 'n' ? numberLabel(Number(spot.slice(1))) : SPOT_NAME[spot]);
 
 /** Ticker lines for the TOURNAMENT display. Results wait until the wheel has stopped on screen. */
 function describe(prev: GameState, s: GameState): TickerLine[] {
@@ -31,7 +31,7 @@ function describe(prev: GameState, s: GameState): TickerLine[] {
   if (s.phase === 'settled' && prev.phase !== 'settled' && s.result !== null) {
     lines.push({ text: 'No more bets. The wheel spins…' });
     const n = s.result;
-    lines.push({ text: `${n === 0 ? 'Zero' : `${RED.has(n) ? 'Red' : 'Black'} ${n}`}!`, delay: SPIN_MS });
+    lines.push({ text: `${resultName(n)}!`, delay: SPIN_MS });
     for (const p of s.players) {
       const stake = staked(p.bets);
       if (!stake) continue;

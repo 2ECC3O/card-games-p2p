@@ -62,6 +62,7 @@ export default function App() {
   const [code, setCode] = useState(urlRoom);
   const [stack, setStack] = useState('1000');
   const [minBet, setMinBet] = useState<(typeof MIN_BETS)[number]>(10);
+  const [doubleZero, setDoubleZero] = useState(false);
   const [busy, setBusy] = useState<'join' | 'create' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -121,7 +122,7 @@ export default function App() {
     const startingStack = Number(stack);
     if (!Number.isInteger(startingStack) || startingStack < minBet * 2)
       return setNotice(`The starting stack must be a whole number of at least ${minBet * 2} (two minimum bets).`);
-    const config: TableConfig = { startingStack, minBet };
+    const config: TableConfig = { startingStack, minBet, doubleZero };
 
     setBusy('create');
     setNotice(null);
@@ -203,7 +204,7 @@ export default function App() {
         <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 03 / Roulette</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="◎"><p className="edition">1–10 players · Single zero</p>
+            <header className="lobby-intro" data-mark="◎"><p className="edition">1–10 players · Single or double zero</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Roulette <span className="text-red-400">P2P</span>
               </h1>
@@ -278,10 +279,15 @@ export default function App() {
             <fieldset className="mt-4">
               <legend className={label}>Minimum bet</legend>
               <Segmented name="minBet" options={MIN_BETS} value={minBet} onChange={setMinBet} />
-              <p className="mt-2 text-sm text-slate-400">
-                Single-zero wheel. A number pays 35 to 1, dozens and columns 2 to 1, red or black, odd or even and high or low 1 to 1.
-              </p>
             </fieldset>
+
+            <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input type="checkbox" checked={doubleZero} onChange={(e) => setDoubleZero(e.target.checked)} className="size-5 accent-red-600" />
+              Double zero: the American wheel, with 00 beside the 0
+            </label>
+            <p className="mt-2 text-sm text-slate-400">
+              {doubleZero ? 'Double-zero wheel, 38 pockets' : 'Single-zero wheel, 37 pockets'}. A number pays 35 to 1, dozens and columns 2 to 1, red or black, odd or even and high or low 1 to 1.
+            </p>
 
             <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
               {busy === 'create' ? 'Creating room…' : 'Create room'}

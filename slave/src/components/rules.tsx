@@ -20,7 +20,7 @@ export const RULES: Page[] = [
         <Hand cards="9♣ 9♦ 9♥" />
       </>
     ),
-    text: <>Play a <b>single</b>, a <b>pair</b>, <b>three of a kind</b> (ตอง) or <b>four of a kind</b>. No runs. Every round, whoever holds <b>3♣</b> leads.</>,
+    text: <>Play a <b>single</b>, a <b>pair</b>, <b>three of a kind</b> or <b>four of a kind</b>. No runs. Every round, whoever holds <b>3♣</b> leads.</>,
   },
   {
     title: 'Beat the pile, or pass',
@@ -35,7 +35,7 @@ export const RULES: Page[] = [
   {
     title: 'Titles',
     picture: <div className="htp-row"><Tag>King</Tag><Tag>Queen</Tag><Tag>Citizen</Tag><Tag>Serf</Tag><Tag>Slave</Tag></div>,
-    text: <>First out is <b>King</b>, second <b>Queen</b>, last <b>Slave</b> and second-last <b>Serf</b> (รองสลาฟ). Everyone else is a Citizen. With three players there's no Queen or Serf. Each round earns points: first of 5 gets 4, last gets 0.</>,
+    text: <>First out is <b>King</b>, second <b>Queen</b>, last <b>Slave</b> and second-last <b>Serf</b>. Everyone else is a Citizen. With three players there's no Queen or Serf. Each round earns points: first of 5 gets 4, last gets 0.</>,
   },
   {
     title: 'The exchange',

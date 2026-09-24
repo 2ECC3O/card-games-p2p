@@ -1,5 +1,5 @@
 /**
- * Where a bet can go: a single number ("n0" to "n36") or an outside bet. d1-d3 are the dozens (1-12, 13-24,
+ * Where a bet can go: a single number ("n0" to "n36", and "n37" for 00 on a double-zero wheel) or an outside bet. d1-d3 are the dozens (1-12, 13-24,
  * 25-36), c1-c3 the columns (c1 = 1, 4, 7 ... 34).
  */
 export type Spot = `n${number}` | 'red' | 'black' | 'odd' | 'even' | 'low' | 'high' | 'd1' | 'd2' | 'd3' | 'c1' | 'c2' | 'c3';
@@ -10,6 +10,8 @@ export type Phase = 'waiting' | 'betting' | 'settled';
 export interface TableConfig {
   startingStack: number;
   minBet: number;
+  /** American wheel: a 00 pocket (stored as 37) beside the 0, 38 pockets in all. */
+  doubleZero?: boolean;
 }
 
 export interface Player {

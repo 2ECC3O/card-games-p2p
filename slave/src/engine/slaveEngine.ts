@@ -47,7 +47,7 @@ const top = (cards: Card[]) => Math.max(...cards.map(value));
 
 /**
  * One to four cards of one rank. Anything goes on an empty pile; otherwise the same count with a higher top card: a
- * higher rank, or the same rank with a higher suit (7♠ on 7♥, 7♠ 7♣ on 7♥ 7♦). Three of a kind (ตอง) also beats
+ * higher rank, or the same rank with a higher suit (7♠ on 7♥, 7♠ 7♣ on 7♥ 7♦). Three of a kind also beats
  * any single, and four of a kind any pair.
  */
 export function beats(cards: Card[], pile: Card[] | null): boolean {

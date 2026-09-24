@@ -1,6 +1,6 @@
 # Slave P2P
 
-Slave (สลาฟ), the Thai climbing card game, for up to 8 players (plus a waiting queue), played in the browser with
+Slave, the Thai climbing card game, for up to 8 players (plus a waiting queue), played in the browser with
 friends or bots. No chips, no accounts, no money, no game server. One player's browser hosts the table; everyone
 else connects to it directly.
 
@@ -19,7 +19,7 @@ own engine and table, in plum.
 - **Deal:** one 52-card deck, no jokers, all dealt out. Uneven hands are fine. You see only your own cards.
 - **Rank:** 3 is lowest, then 4 up to K, A, and **2 is highest**. Within a rank the suit decides, ♣ < ♦ < ♥ < ♠, so
   **2♠ is the highest card**.
-- **Plays:** a single, a pair, three of a kind (ตอง) or four of a kind. No straights (สเตจ).
+- **Plays:** a single, a pair, three of a kind or four of a kind. No straights.
 - **Beating the pile:** the same number of cards with a higher top card: a higher rank, or the same rank with a
   higher suit (7♠ on 7♥; 7♠ 7♣ on 7♥ 7♦). Three of a kind also beats any single, and four
   of a kind beats any pair.
@@ -28,7 +28,7 @@ own engine and table, in plum.
   leads. Time out and you pass, or play your lowest card if it's your lead.
 - **Who starts:** every round, whoever holds 3♣ (after the exchange) leads. Turns then go whichever way round
   reaches last round's Slave sooner: clockwise on a tie, in the first round, or when the Slave holds 3♣.
-- **Titles:** first out is **King**, second **Queen**, second-last **Serf** (รองสลาฟ), last **Slave**, everyone else
+- **Titles:** first out is **King**, second **Queen**, second-last **Serf**, last **Slave**, everyone else
   **Citizen**. With 3 players there's no Queen or Serf; with 2, just King and Slave.
 - **Falls:** a King who isn't first out drops to Slave. A Queen who then isn't in the top two drops to Serf.
 - **Exchange (30 s):** at each deal the Slave's two best cards are set aside for the King and the Serf's best card

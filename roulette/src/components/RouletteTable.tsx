@@ -1,6 +1,6 @@
 import { WifiSlashIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { BET_MS, OUTSIDE, payoutMultiple, RED, SPIN_MS, staked, WHEEL } from '../engine/rouletteEngine';
+import { BET_MS, DOUBLE_ZERO, numberLabel, OUTSIDE, payoutMultiple, RED, SPIN_MS, staked, wheelOf } from '../engine/rouletteEngine';
 import { profitChance } from '../engine/odds';
 import type { GameState, Spot } from '../types/roulette';
 
@@ -26,7 +26,9 @@ function useMedia(query: string) {
   return match;
 }
 
-const colorOf = (n: number) => (n === 0 ? 'Green' : RED.has(n) ? 'Red' : 'Black');
+const colorOf = (n: number) => (n === 0 || n === DOUBLE_ZERO ? 'Green' : RED.has(n) ? 'Red' : 'Black');
+/** "Zero", "Double zero", "Red 7". */
+export const resultName = (n: number) => (n === 0 ? 'Zero' : n === DOUBLE_ZERO ? 'Double zero' : `${colorOf(n)} ${n}`);
 const TONE = { Green: 'bg-emerald-700', Red: 'bg-red-600', Black: 'bg-slate-950' };
 /** One colour per seat, so everyone can see whose chips are where. Light enough to read on red, black and green. */
 export const PLAYER_COLORS = ['#38bdf8', '#a3e635', '#e879f9', '#fb923c', '#a78bfa', '#fde047', '#34d399', '#f9a8d4', '#f8fafc', '#94a3b8'];
@@ -35,10 +37,9 @@ const short = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 10
 
 // ------------------------------------------------ wheel
 
-const STEP = 360 / 37;
 const polar = (r: number, deg: number) => `${(r * Math.sin((deg * Math.PI) / 180)).toFixed(2)} ${(-r * Math.cos((deg * Math.PI) / 180)).toFixed(2)}`;
-/** One pocket, centred on the top of the wheel; each is rotated into place. The ball track is the rim outside them. */
-const POCKET = `M${polar(86, -STEP / 2)} A86 86 0 0 1 ${polar(86, STEP / 2)} L${polar(58, STEP / 2)} A58 58 0 0 0 ${polar(58, -STEP / 2)}Z`;
+/** One pocket `step` degrees wide, centred on the top of the wheel; each is rotated into place. The ball track is the rim outside them. */
+const pocket = (step: number) => `M${polar(86, -step / 2)} A86 86 0 0 1 ${polar(86, step / 2)} L${polar(58, step / 2)} A58 58 0 0 0 ${polar(58, -step / 2)}Z`;
 const FILL = { Green: '#047857', Red: '#dc2626', Black: '#0f172a' };
 const TRACK_R = 92; // where the ball runs
 const POCKET_R = 65; // where it comes to rest
@@ -82,13 +83,15 @@ function SpinningBall() {
 }
 
 /** Spins (a few turns, then eases out) to put `result` under the marker at the top whenever `spinKey` changes. */
-function Wheel({ result, spinKey, landed, className }: { result: number | null; spinKey: string; landed: boolean; className: string }) {
+function Wheel({ wheel, result, spinKey, landed, className }: { wheel: number[]; result: number | null; spinKey: string; landed: boolean; className: string }) {
+  const STEP = 360 / wheel.length;
+  const POCKET = pocket(STEP);
   const [reduced] = useState(reducedMotion);
   const turned = useRef(0);
   const [angle, setAngle] = useState(0);
   useEffect(() => {
     if (result === null) return;
-    const target = -WHEEL.indexOf(result) * STEP;
+    const target = -wheel.indexOf(result) * STEP;
     const extra = (((target - turned.current) % 360) + 360) % 360;
     turned.current += extra + (reduced ? 0 : 360 * 5);
     setAngle(turned.current);
@@ -96,17 +99,17 @@ function Wheel({ result, spinKey, landed, className }: { result: number | null; 
   }, [spinKey]);
 
   return (
-    <svg viewBox="-100 -100 200 200" className={`shrink-0 drop-shadow-[0_8px_16px_rgba(0,0,0,.6)] ${className}`} role="img" aria-label={landed && result !== null ? `The wheel stopped on ${result}` : 'Roulette wheel'}>
+    <svg viewBox="-100 -100 200 200" className={`shrink-0 drop-shadow-[0_8px_16px_rgba(0,0,0,.6)] ${className}`} role="img" aria-label={landed && result !== null ? `The wheel stopped on ${numberLabel(result)}` : 'Roulette wheel'}>
       <circle r="99.5" fill="#451a03" />
       {/* The ball track: a darker groove between the wooden rim and the pockets. */}
       <circle r="92.5" fill="none" stroke="#1c0f05" strokeWidth="11" />
       <circle r="86.5" fill="none" stroke="#d6b86a" strokeOpacity="0.5" strokeWidth="1" />
       <g style={{ transform: `rotate(${angle}deg)`, transition: reduced ? 'none' : `transform ${SPIN_MS - 400}ms cubic-bezier(0.12, 0.6, 0.08, 1)` }}>
-        {WHEEL.map((n, i) => (
+        {wheel.map((n, i) => (
           <g key={n} transform={`rotate(${i * STEP})`}>
             <path d={POCKET} fill={FILL[colorOf(n)]} stroke="#d6d3d1" strokeOpacity="0.35" strokeWidth="0.6" />
-            <text y="-77" fill="#f8fafc" fontSize="7.5" fontWeight="600" textAnchor="middle" dominantBaseline="middle">
-              {n}
+            <text y="-77" fill="#f8fafc" fontSize={wheel.length > 37 ? 7 : 7.5} fontWeight="600" textAnchor="middle" dominantBaseline="middle">
+              {numberLabel(n)}
             </text>
           </g>
         ))}
@@ -155,10 +158,12 @@ const OUTSIDE_CELLS: Record<(typeof OUTSIDE)[number], Omit<Cell, 'spot' | 'tone'
 /**
  * The layout: zero, then the numbers in rows of three (1, 2, 3 / 4, 5, 6 ...), the column bets at the far end,
  * dozens and even-money bets alongside. Landscape screens lay it out left to right with 3 on top; portrait screens stand it
- * upright with 1 on the left. Grid lines are 1-based, and the numbers start one line in, after the zero.
+ * upright with 1 on the left. Grid lines are 1-based, and the numbers start one line in, after the zero; a double-zero
+ * table puts 00 one more line out, before the 0.
  */
-function cells(upright: boolean): (Cell & { style: CSSProperties })[] {
+function cells(upright: boolean, doubleZero: boolean): (Cell & { style: CSSProperties })[] {
   const all: Cell[] = [
+    ...(doubleZero ? [{ spot: `n${DOUBLE_ZERO}` as Spot, label: '00', name: 'Double zero', tone: TONE.Green, along: -2, across: 0, acrossSpan: 3 }] : []),
     { spot: 'n0', label: '0', name: '0', tone: TONE.Green, along: -1, across: 0, acrossSpan: 3 },
     ...Array.from({ length: 36 }, (_, i): Cell => ({ spot: `n${i + 1}`, label: `${i + 1}`, name: `${i + 1}`, tone: TONE[colorOf(i + 1)], along: Math.floor(i / 3), across: i % 3 })),
     ...OUTSIDE.map((spot) => ({ spot, tone: '', ...OUTSIDE_CELLS[spot] })),
@@ -166,26 +171,26 @@ function cells(upright: boolean): (Cell & { style: CSSProperties })[] {
   return all.map((c) => {
     // Across index for the number rows: 0 = the column holding 1, 4, 7 ... Lying down, that row is at the bottom.
     const across = c.across < 3 && !upright ? 3 - c.across - (c.acrossSpan ?? 1) : c.across;
-    const a = `${c.along + 2} / span ${c.alongSpan ?? 1}`;
+    const a = `${c.along + (doubleZero ? 3 : 2)} / span ${c.alongSpan ?? 1}`;
     const b = `${across + 1} / span ${c.acrossSpan ?? 1}`;
     return { ...c, style: upright ? { gridRow: a, gridColumn: b } : { gridColumn: a, gridRow: b } };
   });
 }
-const LYING = cells(false);
-const UPRIGHT = cells(true);
+const LAYOUTS = { lying: cells(false, false), upright: cells(true, false), lying00: cells(false, true), upright00: cells(true, true) };
 
 function Board({ state, heroId, canBet, onPlace, landed, upright }: { state: GameState; heroId: string; canBet: boolean; onPlace: (s: Spot) => void; landed: boolean; upright: boolean }) {
   const hero = state.players.find((p) => p.id === heroId);
   const result = landed ? state.result : null;
+  const dz = !!state.config.doubleZero;
   return (
     <div
       className={`grid overflow-hidden rounded-lg ring-1 ring-white/30 ${
         upright
-          ? 'max-h-[31.5rem] w-full flex-1 grid-cols-[repeat(3,minmax(0,1fr))_3.75rem_3.75rem] sm:max-h-[42rem] sm:grid-cols-[repeat(3,minmax(0,1fr))_5rem_5rem] grid-rows-[repeat(14,minmax(1.3rem,1fr))]'
-          : 'min-w-0 flex-1 grid-cols-[repeat(14,minmax(0,1fr))] grid-rows-[repeat(3,3rem)_2.5rem_2.5rem] lg:grid-rows-[repeat(3,3.5rem)_2.75rem_2.75rem] tall:grid-rows-[repeat(3,4rem)_3rem_3rem]'
+          ? `max-h-[31.5rem] w-full flex-1 grid-cols-[repeat(3,minmax(0,1fr))_3.75rem_3.75rem] sm:max-h-[42rem] sm:grid-cols-[repeat(3,minmax(0,1fr))_5rem_5rem] ${dz ? 'grid-rows-[repeat(15,minmax(1.3rem,1fr))]' : 'grid-rows-[repeat(14,minmax(1.3rem,1fr))]'}`
+          : `min-w-0 flex-1 ${dz ? 'grid-cols-[repeat(15,minmax(0,1fr))]' : 'grid-cols-[repeat(14,minmax(0,1fr))]'} grid-rows-[repeat(3,3rem)_2.5rem_2.5rem] lg:grid-rows-[repeat(3,3.5rem)_2.75rem_2.75rem] tall:grid-rows-[repeat(3,4rem)_3rem_3rem]`
       }`}
     >
-      {(upright ? UPRIGHT : LYING).map(({ spot, label, name, tone, style }) => {
+      {LAYOUTS[`${upright ? 'upright' : 'lying'}${dz ? '00' : ''}`].map(({ spot, label, name, tone, style }) => {
         const mine = hero?.bets[spot] ?? 0;
         const others = state.players.filter((p) => p.id !== heroId && p.bets[spot]);
         const won = result !== null && payoutMultiple(spot, result) > 0;
@@ -246,7 +251,7 @@ function TimerBar({ deadline, total, className }: { deadline: number; total: num
 function Ball({ n, big = false }: { n: number; big?: boolean }) {
   return (
     <span className={`grid shrink-0 place-items-center rounded-full font-mono font-semibold text-slate-50 ring-1 ring-white/25 ${TONE[colorOf(n)]} ${big ? 'size-9 text-base sm:size-11 sm:text-lg' : 'size-6 text-[10px] sm:size-7 sm:text-xs'}`}>
-      {n}
+      {numberLabel(n)}
     </span>
   );
 }
@@ -276,7 +281,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
   const history = settled && !landed ? state.history.slice(1) : state.history;
 
   const status = !state.started ? (
-    <p className="text-sm text-slate-300">Single-zero wheel. The game starts when the host presses Start.</p>
+    <p className="text-sm text-slate-300">{state.config.doubleZero ? 'Double-zero' : 'Single-zero'} wheel. The game starts when the host presses Start.</p>
   ) : state.phase === 'betting' && state.deadline ? (
     <div className="flex w-36 shrink-0 flex-col gap-1.5 sm:w-52">
       <p className="text-base font-semibold sm:text-lg">Place your bets</p>
@@ -287,7 +292,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
   ) : landed && state.result !== null ? (
     <div className="rise-in flex shrink-0 items-center gap-2.5">
       <Ball n={state.result} big />
-      <p className="text-base font-semibold sm:text-lg">{state.result === 0 ? 'Zero' : `${colorOf(state.result)} ${state.result}`}</p>
+      <p className="text-base font-semibold sm:text-lg">{resultName(state.result)}</p>
     </div>
   ) : (
     <p className="text-sm text-slate-300">{state.botMatch && state.players.length === 1 && !state.queue.length ? `${state.players[0].name} wins the match!` : 'Waiting for players…'}</p>
@@ -355,6 +360,7 @@ export default function RouletteTable({ state, heroId, invite, canBet, onPlace }
       >
         <div ref={wheelRef} className="scroll-mt-2">
           <Wheel
+            wheel={wheelOf(state.config)}
             result={settled ? state.result : null}
             spinKey={`${state.round}-${state.phase}`}
             landed={landed}

@@ -13,18 +13,24 @@ const HISTORY = 15;
 
 // ------------------------------------------------ the wheel
 
+/** 00 on a double-zero wheel. Numbers are stored as numbers, so it's 37; show it with `numberLabel`. */
+export const DOUBLE_ZERO = 37;
+export const numberLabel = (n: number) => (n === DOUBLE_ZERO ? '00' : `${n}`);
 /** Single-zero (European) wheel, pockets clockwise from 0. */
 export const WHEEL = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+/** Double-zero (American) wheel, pockets clockwise from 0; 37 is 00. */
+export const AMERICAN_WHEEL = [0, 28, 9, 26, 30, 11, 7, 20, 32, 17, 5, 22, 34, 15, 3, 24, 36, 13, 1, DOUBLE_ZERO, 27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 21, 33, 16, 4, 23, 35, 14, 2];
+export const wheelOf = (config: TableConfig) => (config.doubleZero ? AMERICAN_WHEEL : WHEEL);
 export const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
 export const OUTSIDE = ['red', 'black', 'odd', 'even', 'low', 'high', 'd1', 'd2', 'd3', 'c1', 'c2', 'c3'] as const;
-export const SPOTS: readonly Spot[] = [...Array.from({ length: 37 }, (_, n) => `n${n}` as Spot), ...OUTSIDE];
+export const SPOTS: readonly Spot[] = [...Array.from({ length: 38 }, (_, n) => `n${n}` as Spot), ...OUTSIDE];
 const VALID = new Set<string>(SPOTS);
 
 /** Chips returned per chip staked when `n` comes up (stake included): 36 for a number, 3 for a dozen or column, 2 for even money, else 0. */
 export function payoutMultiple(spot: Spot, n: number): number {
   if (spot[0] === 'n') return Number(spot.slice(1)) === n ? 36 : 0;
-  if (n === 0) return 0; // zero loses every outside bet
+  if (n === 0 || n === DOUBLE_ZERO) return 0; // 0 and 00 lose every outside bet
   switch (spot) {
     case 'red': return RED.has(n) ? 2 : 0;
     case 'black': return RED.has(n) ? 0 : 2;
@@ -199,7 +205,7 @@ function spinIfAllDone(s: GameState, now: number) {
 }
 
 /** Mutates: no more bets, spin, pay out. `result` lets tests pick the number. */
-export function spin(s: GameState, now: number, result = randomInt(37)) {
+export function spin(s: GameState, now: number, result = wheelOf(s.config)[randomInt(wheelOf(s.config).length)]) {
   const playing = s.players.filter((p) => staked(p.bets) > 0);
   if (!playing.length) return startRound(s, now); // nobody bet: open a fresh window
   Object.assign(s, { phase: 'settled', result, deadline: null, nextRoundAt: now + SPIN_MS + SETTLE_MS });
@@ -224,7 +230,7 @@ function act(s: GameState, id: string, action: PlayerAction) {
   switch (action.type) {
     case 'bet': {
       const { spot, amount } = action;
-      if (!VALID.has(spot)) throw new Error('Invalid bet');
+      if (!VALID.has(spot) || (spot === `n${DOUBLE_ZERO}` && !s.config.doubleZero)) throw new Error('Invalid bet');
       if (!Number.isInteger(amount) || amount < s.config.minBet || amount > p.chips) throw new Error('Not enough chips');
       p.chips -= amount;
       p.bets[spot] = (p.bets[spot] ?? 0) + amount;

@@ -1,6 +1,6 @@
 # Roulette P2P
 
-Single-zero roulette for up to 10 players around one wheel (plus a waiting queue), played in the browser.
+Roulette, single or double zero, for up to 10 players around one wheel (plus a waiting queue), played in the browser.
 Free to play with virtual chips only: no accounts, no money, no game server. One player's browser tab hosts
 the table and spins the wheel; everyone else connects to it directly (peer to peer).
 
@@ -40,9 +40,11 @@ the [Hold'em README](../poker/README.md).
   done or the time runs out. Anyone who hasn't bet sits the round out.
 - **Payouts:** a single number pays 35 to 1, a dozen or a column 2 to 1, and red/black, odd/even and
   1-18/19-36 pay 1 to 1. Zero loses every bet except a bet on zero.
+- **Double zero:** tick **Double zero** when creating the room for the American wheel: a green 00 beside the 0,
+  38 pockets, the American pocket order. 00 pays 35 to 1 straight up and, like 0, loses every other bet.
 - **Out of chips:** press **Rejoin** to come back with a fresh stack at the next round.
 - **Bots:** the host can add bots before or during play. They bet the minimum on red or black. A bot that cannot afford the minimum leaves permanently. A bot match stops when only one funded seat remains.
-- **Watching:** spectators and the TOURNAMENT display see each player's exact chance of net profit on the current bets across all 37 pockets.
+- **Watching:** spectators and the TOURNAMENT display see each player's exact chance of net profit on the current bets across every pocket (37, or 38 with double zero).
 
 Splits, streets, corners and lines (bets on the lines between numbers) aren't offered.
 
