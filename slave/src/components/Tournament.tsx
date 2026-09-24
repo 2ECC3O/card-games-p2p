@@ -1,5 +1,5 @@
 import type { GameState } from '../types/slave';
-import { cardsText, ordinal } from './SlaveTable';
+import { cardsText, oddsLabel, ordinal, type Odds } from './SlaveTable';
 import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
 
 const nameOf = (s: GameState, id: string | null) => s.players.find((p) => p.id === id)?.name ?? 'Someone';
@@ -24,11 +24,11 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
   return lines;
 }
 
-export default function Tournament({ state, url }: { state: GameState; url: string }) {
+export default function Tournament({ state, url, odds }: { state: GameState; url: string; odds: Odds }) {
   const feed = useTicker(state, describe);
   const leaders = state.players.map((p) => ({
-    id: p.id, name: p.name, connected: p.connected, points: p.points,
-    note: [p.title, state.phase === 'playing' || state.phase === 'exchange' ? `${p.hand.length} cards` : ''].filter(Boolean).join(' · '),
+    id: p.id, name: p.name, connected: p.connected, points: p.points, chance: odds[p.id] && oddsLabel(state, odds[p.id]),
+    note: [p.title, state.phase === 'playing' || state.phase === 'exchange' ? `${p.hand.length} card${p.hand.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '),
   }));
   return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} feed={feed} />;
 }

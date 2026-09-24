@@ -14,6 +14,8 @@ export interface Leader {
   connected: boolean;
   /** Title and cards left. */
   note: string;
+  /** Live odds, "King ~34%". */
+  chance?: string;
 }
 
 interface Entry {
@@ -63,7 +65,7 @@ export default function TournamentPanel({ code, url, leaders, feed }: { code: st
       </div>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Points</h2>
+        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Points · Live odds</h2>
         {ranked.length === 0 ? (
           <p className="text-sm text-slate-400">Nobody seated yet.</p>
         ) : (
@@ -73,6 +75,7 @@ export default function TournamentPanel({ code, url, leaders, feed }: { code: st
                 <span className="w-5 text-right font-mono text-sm text-slate-400">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
                 <span className="text-xs text-slate-400 xl:text-sm">{p.note}</span>
+                {p.chance && <span className="font-mono text-xs font-semibold text-amber-200 xl:text-sm" title="Chance from simulated playouts of the cards on the table">{p.chance}</span>}
                 <span className="w-10 text-right font-mono font-semibold">{p.points}</span>
               </li>
             ))}

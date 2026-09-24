@@ -3,9 +3,16 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { TURN_MS } from '../engine/slaveEngine';
 import type { Card, GameState, Player, Title } from '../types/slave';
 
+export type Odds = Record<string, { king: number; slave: number }>;
+const pct = (n: number) => `~${Math.round(n * 100)}%`;
+/** Until someone is out the race is for King; after that, to stay clear of Slave. */
+export const oddsLabel = (s: GameState, c: Odds[string]) => (s.out.length ? `Slave ${pct(c.slave)}` : `King ${pct(c.king)}`);
+
 interface Props {
   state: GameState;
   heroId: string;
+  /** Spectators only: each seat's chance to end the round King, and Slave. */
+  odds?: Odds;
   /** Shown in the middle of the table before the game starts. */
   invite: ReactNode;
 }
@@ -71,7 +78,7 @@ export const TITLE_TONE: Record<Title, string> = {
   Slave: 'bg-slate-950 text-slate-300 ring-1 ring-white/30',
 };
 
-function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boolean }) {
+function Seat({ p, state, isHero, odds }: { p: Player; state: GameState; isHero: boolean; odds?: Odds[string] }) {
   const active = state.activeId === p.id || (state.phase === 'exchange' && state.gives.some((g) => g.from === p.id && !g.cards.length));
   const deadline = active ? state.deadline : null;
   const place = state.out.indexOf(p.id);
@@ -93,6 +100,7 @@ function Seat({ p, state, isHero }: { p: Player; state: GameState; isHero: boole
       </div>
       <div className="font-mono text-sm font-semibold text-slate-50 tall:text-base">{p.points} pt{p.points === 1 ? '' : 's'}</div>
       {deadline ? <SecondsLeft key={`secs-${deadline}`} deadline={deadline} /> : status && <div className="truncate text-[11px] text-slate-400 tall:text-xs">{status}</div>}
+      {odds && <div className="font-mono text-[11px] font-semibold text-amber-200 tall:text-xs" title="Chance from simulated playouts of the cards on the table">{oddsLabel(state, odds)}</div>}
     </div>
   );
 }
@@ -105,7 +113,7 @@ function seatPoint(i: number, n: number) {
 }
 const at = ({ x, y }: { x: number; y: number }) => ({ left: `${50 + x}%`, top: `${50 + y}%` });
 
-export default function SlaveTable({ state, heroId, invite }: Props) {
+export default function SlaveTable({ state, heroId, invite, odds }: Props) {
   const { players } = state;
   const nameOf = (id: string) => (id === heroId ? 'You' : (players.find((p) => p.id === id)?.name ?? 'Someone'));
   const heroIndex = Math.max(0, players.findIndex((p) => p.id === heroId));
@@ -182,7 +190,7 @@ export default function SlaveTable({ state, heroId, invite }: Props) {
             className={`absolute -translate-x-1/2 ${i === 0 ? '-translate-y-full' : '-translate-y-1/2'}`}
             style={i === 0 ? { left: '50%', top: '100%' } : at(point)}
           >
-            <Seat p={p} state={state} isHero={p.id === heroId} />
+            <Seat p={p} state={state} isHero={p.id === heroId} odds={odds?.[p.id]} />
           </div>
         );
       })}

@@ -23,16 +23,22 @@ own engine and table, in plum.
   of a kind beats any pair.
 - **Your turn (30 s):** tap cards, then **Play**, or **Pass**. A pass puts you out until the pile clears. When
   everyone else has passed, the pile clears and whoever played it leads; if they're already out, the next player
-  leads. Time out and you pass (or, leading, play your lowest rank).
+  leads. Time out and you pass, or play your lowest card if it's your lead.
 - **Who starts:** the holder of 3♣ in the first round; after that, last round's Slave.
 - **Titles:** first out is **King**, second **Queen**, second-last **Serf** (รองสลาฟ), last **Slave**, everyone else
   **Citizen**. With 3 players there's no Queen or Serf; with 2, just King and Slave.
 - **Falls:** a King who isn't first out drops to Slave. A Queen who then isn't in the top two drops to Serf.
 - **Exchange (30 s):** at each deal the Slave's two best cards go to the King and the Serf's best card to the
-  Queen. The King and Queen then pick the same number of cards to give back. Time out and you give your lowest.
+  Queen. The King and Queen then pick the same number of cards to give back. Time out and you give back your lowest.
 - **Points:** finishing k-th of n earns n − k points, for the TOURNAMENT display's leaderboard.
-- **Bots** lead their lowest rank (all of it) and follow with the lowest play that beats the pile. They never
-  bomb with three or four of a kind. A player who leaves mid-round plays out the round the same way.
+- **Bots** go out whenever one play empties their hand. They lead their lowest rank whole; against a player on one
+  card they lead a pair or more, or their highest single. They follow with the lowest set that fits, breaking up a
+  bigger set only when nothing fits, and hold back 2s and bombs (three or four of a kind) until someone is on two
+  cards or fewer, or they're on four or fewer. In the exchange they give back their lowest singles and keep pairs.
+  A player who leaves mid-round is played out the same way.
+- **Live odds:** spectators and the TOURNAMENT display see each seat's chance to end the round King (until someone
+  is out), then to end it Slave. Their browser plays the round out 200 times from the cards on the table, everyone
+  playing like a bot with a random legal move three times in ten. It's an estimate, not an exact figure.
 
 ## Run it on your own computer
 

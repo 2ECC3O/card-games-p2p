@@ -1,5 +1,5 @@
 import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import HandControls from './components/HandControls';
 import SlaveTable from './components/SlaveTable';
 import InviteCard from './components/InviteCard';
@@ -8,7 +8,7 @@ import { RULES } from './components/rules';
 import Tournament from './components/Tournament';
 import { button, field, label } from './components/ui';
 import type { GameState } from './types/slave';
-import { createGame, MAX_SEATS, MIN_TABLE } from './engine/slaveEngine';
+import { createGame, MAX_SEATS, MIN_TABLE, odds } from './engine/slaveEngine';
 import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
@@ -150,6 +150,9 @@ export default function App() {
   const myTurn = !!game && !!me && ((game.phase === 'playing' && game.activeId === me.id) || (game.phase === 'exchange' && game.gives.some((g) => g.from === me.id && !g.cards.length)));
 
   // Chime once per decision.
+  // Spectators see every hand, so their browser plays the round out many times for live odds.
+  const chances = useMemo(() => (game && net && game.spectators.some((w) => w.id === net.me.id) ? odds(game) : undefined), [game, net]);
+
   const chimeKey = myTurn ? `${game!.round}-${game!.phase}-${game!.pile?.cards.join()}-${game!.passed.length}` : null;
   useEffect(() => {
     if (chimeKey && !muted) chime();
@@ -333,9 +336,9 @@ export default function App() {
 
       <div className={`flex min-h-0 flex-1 ${display ? 'flex-col overflow-y-auto lg:flex-row lg:overflow-hidden' : ''}`}>
         <section className={`relative flex-1 px-1 sm:px-4 ${display ? 'min-h-[60dvh] shrink-0 lg:min-h-0 lg:shrink lg:py-10' : 'min-h-0'}`} aria-label="Slave table">
-          <SlaveTable state={game} heroId={net.me.id} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
+          <SlaveTable state={game} heroId={net.me.id} odds={chances} invite={<InviteCard compact code={game.roomCode} url={url} onShare={share} />} />
         </section>
-        {display && <Tournament state={game} url={url} />}
+        {display && <Tournament state={game} url={url} odds={chances ?? {}} />}
       </div>
 
       {(!display || (isHost && !game.started)) && <footer className="min-h-[4.5rem] pt-1">

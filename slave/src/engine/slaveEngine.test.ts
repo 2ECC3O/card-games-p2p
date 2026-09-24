@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { addBot, addPlayer, applyAction, beats, botMove, createGame, hostTick, maskFor, ranking, startGame, startRound, titles, TURN_MS } from './slaveEngine';
+import { addBot, addPlayer, applyAction, beats, botGive, botMove, createGame, hostTick, maskFor, odds, ranking, startGame, startRound, titles, TURN_MS } from './slaveEngine';
 import type { Card, GameState } from '../types/slave';
 
 // ------------------------------------------------ plays
@@ -16,6 +16,17 @@ assert.ok(!beats(['9c', '9d'], ['8s']), 'a pair is no answer to a single');
 assert.deepEqual(botMove(['3c', '3d', '5h', '9s'], null), ['3c', '3d'], 'leads its lowest rank, all of it');
 assert.deepEqual(botMove(['3c', '3d', '5h', '9s', '9d'], ['4h', '4s']), ['9s', '9d']);
 assert.equal(botMove(['3c', '5h'], ['2s']), null);
+assert.deepEqual(botMove(['5c', '5d', '7h', '9s', 'Kd'], ['4s'], [10]), ['7h'], "doesn't break a pair when a single fits");
+assert.deepEqual(botMove(['5c', '5d', '9c', '9d', 'Jc', 'Jd'], ['8s'], [10]), ['9c'], 'breaks the lowest set that beats when nothing fits');
+assert.equal(botMove(['4c', '6d', '8h', 'Tc', '2s'], ['As'], [10]), null, 'holds its 2 back early on');
+assert.deepEqual(botMove(['4c', '6d', '8h', 'Tc', '2s'], ['As'], [2]), ['2s'], 'and plays it when someone is nearly out');
+assert.equal(botMove(['3c', '3d', '3h', '5s', '6s'], ['Ks'], [10]), null, 'no bomb early on');
+assert.deepEqual(botMove(['3c', '3d', '3h', '5s', '6s'], ['Ks'], [2]), ['3c', '3d', '3h'], 'bombs a single near the end');
+assert.deepEqual(botMove(['9c', '9d'], ['8s', '8h'], [10]), ['9c', '9d'], 'goes out when it can');
+assert.deepEqual(botMove(['5c', '2s'], null, [10]), ['2s'], 'cashes its 2 to lead out the last card');
+assert.deepEqual(botMove(['4c', '6d', '6h', '9s', 'Kc'], null, [1, 8]), ['6d', '6h'], 'leads a pair against a player on one card');
+assert.deepEqual(botMove(['4c', '6d', '9s', 'Kc'], null, [1, 8]), ['Kc'], 'or its highest single');
+assert.deepEqual(botGive(['3c', '3d', '4h', '5s', '9c'], 2), ['4h', '5s'], 'gives back its lowest singles, keeping pairs');
 
 // ------------------------------------------------ titles and falls
 assert.deepEqual(titles(5), ['King', 'Queen', 'Citizen', 'Serf', 'Slave']);
@@ -59,6 +70,20 @@ assert.equal(s.activeId, 'p1', 'a player who went out hands the lead to the next
 const seen = maskFor(s, 'p1');
 assert.deepEqual(seen.players[1].hand, ['6d', '8d', 'Kd']);
 assert.deepEqual(seen.players[2].hand, ['??', '??']);
+
+// Odds: every hand visible (a spectator's view), the same numbers every time, one King per playout.
+const chance = odds(s, 100);
+assert.deepEqual(chance, odds(s, 100), 'seeded by the cards');
+assert.ok(Math.abs(Object.values(chance).reduce((n, c) => n + c.king, 0) - 1) < 1e-9);
+assert.equal(chance.p0.king, 1, 'p0 is already out first');
+assert.deepEqual(odds(seen), {}, "a player's own view hides the other hands");
+
+// Out of time: pass, or lead your lowest card.
+let slow = table([['5c', '5d', '9c'], ['6d'], ['7h'], ['8s']]);
+slow = hostTick(slow, TURN_MS);
+assert.deepEqual(slow.pile?.cards, ['5c'], 'a slow leader plays just their lowest card');
+slow = hostTick(slow, 2 * TURN_MS);
+assert.deepEqual(slow.passed, ['p1'], 'a slow follower passes');
 
 // ------------------------------------------------ exchange
 s = table([[], [], [], []]);

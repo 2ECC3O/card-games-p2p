@@ -25,7 +25,7 @@ export const RULES: Page[] = [
   {
     title: 'Beat the pile, or pass',
     picture: <Hand cards="7♠ 7♥ → 10♣ 10♦" />,
-    text: <>Play the same number of cards, higher. Three of a kind also beats <b>any single</b>, and four of a kind beats <b>any pair</b>. You have 30 seconds.</>,
+    text: <>Play the same number of cards, higher. Three of a kind also beats <b>any single</b>, and four of a kind beats <b>any pair</b>. You have 30 seconds; run out and you pass, or play your lowest card if it's your lead.</>,
   },
   {
     title: 'A pass lasts until the pile clears',

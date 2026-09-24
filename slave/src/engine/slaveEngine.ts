@@ -71,17 +71,46 @@ export function ranking(out: string[], king?: string, queen?: string): string[] 
   return r;
 }
 
-/** Bots and timeouts: lead the lowest rank you hold, follow with the lowest play that beats the pile. `hand` is sorted. */
-export function botMove(hand: Card[], pile: Card[] | null): Card[] | null {
-  // ponytail: greedy, no bombs and no saving 2s for later; smarter bots when players ask.
+/** Cards grouped by rank, low to high. `hand` is sorted. */
+function groupsOf(hand: Card[]): Card[][] {
   const groups: Card[][] = [];
   for (const c of hand) {
     const last = groups.at(-1);
     if (last && last[0][0] === c[0]) last.push(c);
     else groups.push([c]);
   }
-  if (!pile) return groups[0] ?? null;
-  return groups.map((g) => g.slice(0, pile.length)).find((g) => beats(g, pile)) ?? null;
+  return groups;
+}
+
+/**
+ * A bot's play, or null to pass. `hand` is sorted; `others` holds the card counts of the opponents still in.
+ * It goes out whenever one play empties its hand. Leading, it plays its lowest rank whole, but cashes its 2s first
+ * when they're all that stands between it and going out, and with an opponent on one card it leads a set, or else
+ * its highest single. Following, it plays the lowest set that fits, breaking up a bigger set only when nothing fits.
+ * It holds back 2s, and three or four of a kind as a bomb, until the end of the round: an opponent on two cards or
+ * fewer, or itself on four or fewer.
+ */
+export function botMove(hand: Card[], pile: Card[] | null, others: number[] = []): Card[] | null {
+  const groups = groupsOf(hand);
+  if (groups.length === 1 && beats(groups[0], pile)) return groups[0];
+  const endgame = Math.min(...others) <= 2 || hand.length <= 4;
+  if (!pile) {
+    if (groups.length === 2 && groups[1][0][0] === '2') return groups[1];
+    if (others.includes(1)) return groups.find((g) => g.length > 1) ?? groups.at(-1)!;
+    return groups[0];
+  }
+  const k = pile.length;
+  const pick =
+    groups.find((g) => g.length === k && beats(g, pile)) ??
+    groups.filter((g) => g.length > k).map((g) => g.slice(0, k)).find((g) => beats(g, pile)) ??
+    (endgame ? groups.find((g) => g.length === k + 2) : undefined); // a bomb: three on a single, four on a pair
+  return pick && (endgame || pick[0][0] !== '2') ? pick : null;
+}
+
+/** A bot's cards to give back in the exchange: its lowest singles first, keeping its sets together. */
+export function botGive(hand: Card[], count: number): Card[] {
+  const singles = groupsOf(hand).filter((g) => g.length === 1).flat();
+  return [...singles, ...hand.filter((c) => !singles.includes(c))].slice(0, count);
 }
 
 // ------------------------------------------------ helpers
@@ -314,13 +343,14 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
   });
 }
 
-/** What a bot does now. A player who runs out of time gives their lowest cards and passes (or leads their lowest). */
+/** What a bot does now. A player who runs out of time passes, or leads or gives back their lowest cards. */
 function autoAction(s: GameState, id: string, bot: boolean): PlayerAction {
   const p = find(s, id)!;
   const g = s.gives.find((x) => x.from === id && !x.cards.length);
-  if (s.phase === 'exchange' && g) return { type: 'give', cards: p.hand.slice(0, g.count) };
-  if (!bot && s.pile) return { type: 'pass' };
-  const cards = botMove(p.hand, s.pile?.cards ?? null);
+  if (s.phase === 'exchange' && g) return { type: 'give', cards: bot ? botGive(p.hand, g.count) : p.hand.slice(0, g.count) };
+  if (!bot) return s.pile ? { type: 'pass' } : { type: 'play', cards: [p.hand[0]] };
+  const others = s.players.filter((x) => x.id !== id && x.hand.length).map((x) => x.hand.length);
+  const cards = botMove(p.hand, s.pile?.cards ?? null, others);
   return cards ? { type: 'play', cards } : { type: 'pass' };
 }
 
@@ -345,4 +375,44 @@ export function maskFor(state: GameState, viewerId: string): GameState {
     for (const p of s.players) if (p.id !== viewerId) p.hand = p.hand.map(() => '??');
     for (const g of s.gives) if (g.from !== viewerId && g.to !== viewerId) g.cards = g.cards.map(() => '??');
   });
+}
+
+// ------------------------------------------------ odds
+
+/** Every distinct play from `hand`, one per rank and size (suits don't matter), and a pass when there's a pile. */
+function options(hand: Card[], pile: Card[] | null): PlayerAction[] {
+  const all: PlayerAction[] = pile ? [{ type: 'pass' }] : [];
+  for (const g of groupsOf(hand)) for (let n = 1; n <= g.length; n++) if (beats(g.slice(0, n), pile)) all.push({ type: 'play', cards: g.slice(0, n) });
+  return all;
+}
+
+/**
+ * Spectators' odds: each seat's chance to end this round as King, and as Slave, from `samples` playouts of the cards
+ * on the table. Everyone plays like a bot, with a random legal move three times in ten so the playouts differ.
+ * Seeded by the cards, so every screen shows the same numbers. Empty unless every hand is visible.
+ */
+export function odds(state: GameState, samples = 200): Record<string, { king: number; slave: number }> {
+  if (state.phase !== 'playing' || state.players.some((p) => p.hand.includes('??'))) return {};
+  let seed = 2166136261;
+  for (const ch of JSON.stringify([state.players.map((p) => p.hand), state.pile, state.passed, state.activeId])) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+  const random = () => {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    return (seed >>> 0) / 2 ** 32;
+  };
+  const tally = Object.fromEntries(state.players.map((p) => [p.id, { king: 0, slave: 0 }]));
+  for (let i = 0; i < samples; i++) {
+    const s = structuredClone(state);
+    while (s.phase === 'playing') {
+      const id = s.activeId!;
+      const moves = options(find(s, id)!.hand, s.pile?.cards ?? null);
+      act(s, id, random() < 0.3 ? moves[Math.floor(random() * moves.length)] : autoAction(s, id, true), 0);
+    }
+    for (const p of s.players) {
+      if (p.title === 'King') tally[p.id].king++;
+      if (p.title === 'Slave') tally[p.id].slave++;
+    }
+  }
+  return Object.fromEntries(Object.entries(tally).map(([id, c]) => [id, { king: c.king / samples, slave: c.slave / samples }]));
 }

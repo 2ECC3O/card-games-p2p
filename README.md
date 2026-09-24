@@ -34,7 +34,7 @@ Poker spectators and the TOURNAMENT display also see each active hand's **win ch
 
 Blackjack spectators see the estimated chance a player's current hands return a net profit if stood now. Roulette spectators see the exact chance their current bets return a net profit across 37 pockets. In a bot match, a bot that cannot afford the minimum leaves, and the last funded seat wins; a solo blackjack, roulette or Pok Deng room without bots still runs normal rounds. This display does not run brackets or cross-room scores. A tournament display sees hidden cards just like any other spectator, so put the screen where players cannot use it to see opponents' cards.
 
-Slave has no chips: the TOURNAMENT display ranks players by points (finishing k-th of n earns n − k) and shows each title and cards left.
+Slave has no chips: the TOURNAMENT display ranks players by points (finishing k-th of n earns n − k) and shows each title and cards left. Slave spectators and the display also see each seat's estimated chance to end the round King (until someone is out), then Slave, from 200 simulated playouts of the cards on the table.
 
 Pool spectators see a rough live rack outlook based on cleared balls and whose turn it is. The TOURNAMENT display also shows past rack win rate. The outlook is a simple estimate, not a measured winning probability. Pool supports singles or Scotch doubles, and the host fills empty seats with bots when the match starts; a bot shows its aim, target and power for a couple of seconds before each shot. Every screen watches each shot roll out, you aim by dragging on the table with a live trajectory guide, and each shot has a 90-second clock.
 
@@ -45,7 +45,7 @@ Pool spectators see a rough live rack outlook based on cleared balls and whose t
 | someone joins late | they wait in a queue and get dealt in at the next hand |
 | a player reloads the page or their phone locks | they keep their seat if they come back within 60 seconds |
 | the person who made the room leaves | another player's browser takes over after about 6 seconds and the game goes on |
-| a player takes too long | the game moves on for them: check or fold after 60 s in Hold'em, stand after 60 s in blackjack, stay after 60 s in Pok Deng, pass after 30 s in Slave, betting closes after 30 s in blackjack and Pok Deng and 60 s in roulette, a pool shot is a foul after 90 s |
+| a player takes too long | the game moves on for them: check or fold after 60 s in Hold'em, stand after 60 s in blackjack, stay after 60 s in Pok Deng, pass (or lead the lowest card) after 30 s in Slave, betting closes after 30 s in blackjack and Pok Deng and 60 s in roulette, a pool shot is a foul after 90 s |
 | nobody does anything for 5 minutes | the room closes |
 | everyone closes the tab | the room is gone (there's no server keeping it) |
 | you opened the link inside Instagram, TikTok, Messenger... | open it in Safari or Chrome instead; those built-in browsers can block the connection |
