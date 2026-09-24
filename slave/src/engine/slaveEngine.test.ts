@@ -5,7 +5,12 @@ import type { Card, GameState } from '../types/slave';
 // ------------------------------------------------ plays
 assert.ok(beats(['4c'], ['3s']));
 assert.ok(beats(['2c'], ['As']), '2 is the highest card');
-assert.ok(!beats(['7c'], ['7s']), 'same rank never beats, whatever the suit');
+assert.ok(beats(['7s'], ['7h']), 'same rank: the higher suit beats');
+assert.ok(!beats(['7c'], ['7d']), 'suits go clubs, diamonds, hearts, spades');
+assert.ok(beats(['2s'], ['2h']), '2 of spades tops every other 2');
+assert.ok(beats(['7s', '7c'], ['7h', '7d']), "a pair with the higher top card beats the same rank's other pair");
+assert.deepEqual(botMove(['5c', '7c', '7s', '9d', 'Kd'], ['7h'], [10]), ['9d'], 'keeps its pair rather than split it for the top suit');
+assert.deepEqual(botMove(['5c', '7c', '7s', '9c', '9d'], ['7h'], [10]), ['7s'], 'but splits for the top suit when nothing else fits');
 assert.ok(beats(['9c', '9d'], ['8s', '8h']));
 assert.ok(!beats(['9c', 'Td'], null), 'one rank only');
 assert.ok(!beats(['5c', '6c', '7c'], null), 'no straights');

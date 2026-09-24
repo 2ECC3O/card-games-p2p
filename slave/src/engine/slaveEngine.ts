@@ -12,7 +12,7 @@ const BOT_DELAY_MS = 900;
 
 // ------------------------------------------------ cards
 
-/** 3 is the lowest card and 2 the highest. Suits never matter. */
+/** 3 is the lowest rank and 2 the highest. Within a rank, suits go ♣ < ♦ < ♥ < ♠, so 2♠ is the top card. */
 export const RANKS = '3456789TJQKA2';
 export const rank = (c: Card) => RANKS.indexOf(c[0]);
 const SUITS = 'cdhs';
@@ -38,14 +38,18 @@ function newDeck(): Card[] {
   return d;
 }
 
+const value = (c: Card) => rank(c) * 4 + SUITS.indexOf(c[1]);
+const top = (cards: Card[]) => Math.max(...cards.map(value));
+
 /**
- * One to four cards of one rank. Anything goes on an empty pile; otherwise the same count of a higher rank.
- * Three of a kind (ตอง) also beats any single, and four of a kind any pair.
+ * One to four cards of one rank. Anything goes on an empty pile; otherwise the same count with a higher top card: a
+ * higher rank, or the same rank with a higher suit (7♠ on 7♥, 7♠ 7♣ on 7♥ 7♦). Three of a kind (ตอง) also beats
+ * any single, and four of a kind any pair.
  */
 export function beats(cards: Card[], pile: Card[] | null): boolean {
   if (!cards.length || cards.length > 4 || cards.some((c) => c[0] !== cards[0][0])) return false;
   if (!pile) return true;
-  if (cards.length === pile.length) return rank(cards[0]) > rank(pile[0]);
+  if (cards.length === pile.length) return top(cards) > top(pile);
   return (pile.length === 1 && cards.length === 3) || (pile.length === 2 && cards.length === 4);
 }
 
@@ -102,7 +106,7 @@ export function botMove(hand: Card[], pile: Card[] | null, others: number[] = []
   const k = pile.length;
   const pick =
     groups.find((g) => g.length === k && beats(g, pile)) ??
-    groups.filter((g) => g.length > k).map((g) => g.slice(0, k)).find((g) => beats(g, pile)) ??
+    groups.filter((g) => g.length > k).flatMap((g) => [g.slice(0, k), g.slice(-k)]).find((g) => beats(g, pile)) ?? // lowest suits, or the top suit on the same rank
     (endgame ? groups.find((g) => g.length === k + 2) : undefined); // a bomb: three on a single, four on a pair
   return pick && (endgame || pick[0][0] !== '2') ? pick : null;
 }
@@ -379,10 +383,10 @@ export function maskFor(state: GameState, viewerId: string): GameState {
 
 // ------------------------------------------------ odds
 
-/** Every distinct play from `hand`, one per rank and size (suits don't matter), and a pass when there's a pile. */
+/** The plays from `hand`: per rank and size, its lowest suits and its highest; and a pass when there's a pile. */
 function options(hand: Card[], pile: Card[] | null): PlayerAction[] {
   const all: PlayerAction[] = pile ? [{ type: 'pass' }] : [];
-  for (const g of groupsOf(hand)) for (let n = 1; n <= g.length; n++) if (beats(g.slice(0, n), pile)) all.push({ type: 'play', cards: g.slice(0, n) });
+  for (const g of groupsOf(hand)) for (let n = 1; n <= g.length; n++) for (const cards of n < g.length ? [g.slice(0, n), g.slice(-n)] : [g]) if (beats(cards, pile)) all.push({ type: 'play', cards });
   return all;
 }
 

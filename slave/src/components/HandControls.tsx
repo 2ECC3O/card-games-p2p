@@ -35,7 +35,7 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
     ? `Pick ${give.count} card${give.count > 1 ? 's' : ''} to give ${receiver}`
     : myTurn
       ? pile
-        ? `Beat ${cardsText(pile)}: ${pile.length === 1 ? 'a higher single or any three of a kind' : pile.length === 2 ? 'a higher pair or any four of a kind' : `a higher ${pile.length === 3 ? 'three' : 'four'} of a kind`}`
+        ? `Beat ${cardsText(pile)}: ${pile.length === 1 ? 'a higher card or any three of a kind' : pile.length === 2 ? 'a higher pair or any four of a kind' : `a higher ${pile.length === 3 ? 'three' : 'four'} of a kind`}`
         : 'You lead: a single, pair, three or four of a kind'
       : status;
 

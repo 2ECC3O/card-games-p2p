@@ -17,9 +17,11 @@ own engine and table, in plum.
 ## How to play (Thai rules)
 
 - **Deal:** one 52-card deck, no jokers, all dealt out. Uneven hands are fine. You see only your own cards.
-- **Rank:** 3 is lowest, then 4 up to K, A, and **2 is highest**. Suits never matter.
+- **Rank:** 3 is lowest, then 4 up to K, A, and **2 is highest**. Within a rank the suit decides, ♣ < ♦ < ♥ < ♠, so
+  **2♠ is the highest card**.
 - **Plays:** a single, a pair, three of a kind (ตอง) or four of a kind. No straights (สเตจ).
-- **Beating the pile:** the same number of cards of a higher rank. Three of a kind also beats any single, and four
+- **Beating the pile:** the same number of cards with a higher top card: a higher rank, or the same rank with a
+  higher suit (7♠ on 7♥; 7♠ 7♣ on 7♥ 7♦). Three of a kind also beats any single, and four
   of a kind beats any pair.
 - **Your turn (30 s):** tap cards, then **Play**, or **Pass**. A pass puts you out until the pile clears. When
   everyone else has passed, the pile clears and whoever played it leads; if they're already out, the next player

@@ -9,7 +9,7 @@ export const RULES: Page[] = [
   {
     title: '2 is the highest card',
     picture: <Hand cards="3♣ 4♦ … K♥ A♠ 2♣" />,
-    text: <>From lowest to highest: 3, 4, 5 up to K, A, then <b>2 at the top</b>. Suits don't matter. There are no jokers.</>,
+    text: <>From lowest to highest: 3, 4, 5 up to K, A, then <b>2 at the top</b>. Within a rank the suit decides: {'♣ < ♦ < ♥ < ♠'}, so <b>2♠ is the highest card</b>. There are no jokers.</>,
   },
   {
     title: 'Play one rank at a time',
@@ -25,7 +25,7 @@ export const RULES: Page[] = [
   {
     title: 'Beat the pile, or pass',
     picture: <Hand cards="7♠ 7♥ → 10♣ 10♦" />,
-    text: <>Play the same number of cards, higher. Three of a kind also beats <b>any single</b>, and four of a kind beats <b>any pair</b>. You have 30 seconds; run out and you pass, or play your lowest card if it's your lead.</>,
+    text: <>Play the same number of cards, higher: a higher rank, or the same rank with a higher suit (for a pair, compare the top card). Three of a kind also beats <b>any single</b>, and four of a kind beats <b>any pair</b>. You have 30 seconds; run out and you pass, or play your lowest card if it's your lead.</>,
   },
   {
     title: 'A pass lasts until the pile clears',
