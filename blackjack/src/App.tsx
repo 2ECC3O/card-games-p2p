@@ -208,7 +208,7 @@ export default function App() {
           <div className="flex flex-col gap-4">
             <header className="lobby-intro" data-mark="♣"><p className="edition">1–7 players · Against the house</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Blackjack <span className="text-blue-400">P2P</span>
+                Blackjack
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
                 Blackjack with friends against the house, right in the browser. Virtual chips, no sign-up.

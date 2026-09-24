@@ -85,9 +85,6 @@ body {
   font-weight: 800;
   margin-bottom: 17px;
 }
-.lobby h1 span {
-  display: none;
-}
 .lobby-intro > p:last-child {
   font-size: 17px;
   line-height: 1.6;

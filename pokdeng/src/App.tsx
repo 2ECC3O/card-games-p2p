@@ -205,9 +205,9 @@ export default function App() {
         <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 05 / Pok Deng</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="♦"><p className="edition">1–7 players · Take turns dealing</p>
+            <header className="lobby-intro" data-mark="♦"><p className="edition">1–7 players · Against the dealer</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Pok Deng <span className="text-yellow-400">P2P</span>
+                Pok Deng
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
                 The Thai card game of eights and nines, with the deal passing round the table. Virtual chips, no sign-up.

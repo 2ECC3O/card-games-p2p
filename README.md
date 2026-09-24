@@ -8,12 +8,12 @@ Poker, blackjack, roulette, eight-ball pool, Pok Deng and Slave you play with fr
 
 | Game | Players | You play against | Link |
 |---|---|---|---|
-| Texas Hold'em | 1 to 10, with bots | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
-| Blackjack | 1 to 7 | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
-| Roulette | 1 to 10 | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
-| Eight-ball pool | 1 to 4, with bots | the other team | [play](https://2ecc3o.github.io/card-games-p2p/pool/) |
-| Pok Deng | 1 to 7, with bots | whoever deals this round (it rotates; alone, the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/pokdeng/) |
-| Slave | 1 to 8, with bots | each other, for King (fewer than 4 fills with bots) | [play](https://2ecc3o.github.io/card-games-p2p/slave/) |
+| Texas Hold'em | 1–10, with bots | each other | [play](https://2ecc3o.github.io/card-games-p2p/poker/) |
+| Blackjack | 1–7, with bots | the dealer (the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/blackjack/) |
+| Roulette | 1–10, with bots | the wheel (the app spins it) | [play](https://2ecc3o.github.io/card-games-p2p/roulette/) |
+| Eight-Ball Pool | 1–4, with bots | the other team | [play](https://2ecc3o.github.io/card-games-p2p/pool/) |
+| Pok Deng | 1–7, with bots | whoever deals this round (it rotates; alone, the app deals) | [play](https://2ecc3o.github.io/card-games-p2p/pokdeng/) |
+| Slave | 1–8, with bots | each other, for King (fewer than 4 fills with bots) | [play](https://2ecc3o.github.io/card-games-p2p/slave/) |
 
 ## Start a game in a minute
 

@@ -220,9 +220,9 @@ export default function App() {
         <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 01 / Hold’em</span></nav>
         <div className="lobby-layout">
           <div className="flex flex-col gap-4">
-            <header className="lobby-intro" data-mark="♠"><p className="edition">1–10 players · Texas Hold’em</p>
+            <header className="lobby-intro" data-mark="♠"><p className="edition">1–10 players · Against each other</p>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Hold'em <span className="text-emerald-400">P2P</span>
+                Hold'em
               </h1>
               <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
                 Texas Hold'em with friends, right in the browser. Virtual chips, no sign-up.

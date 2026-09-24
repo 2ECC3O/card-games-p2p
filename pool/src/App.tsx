@@ -1,3 +1,4 @@
+import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import PoolTable from './components/PoolTable';
 import TournamentPanel from './components/TournamentPanel';
@@ -7,6 +8,7 @@ import { RULES } from './components/rules';
 import { button, field, label } from './components/ui';
 import { createGame, isBot, rackOutlook, SHOT_CLOCK_MS } from './engine/poolEngine';
 import { FRAME_EVERY, HZ, simulate } from './engine/physics';
+import { useAudio } from './hooks/useAudio';
 import { useWakeLock } from './hooks/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
 import type { Ball, GameState, Pocket, Side } from './types/pool';
@@ -75,7 +77,7 @@ export default function App() {
   const [code, setCode] = useState(urlRoom);
   const [mode, setMode] = useState<GameState['mode']>('singles');
   const [raceTo, setRaceTo] = useState(3);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'join' | 'create' | null>(null);
   const [notice, setNotice] = useState('');
   const [net, setNet] = useState<TableNet | null>(null);
   const [game, setGame] = useState<GameState | null>(null);
@@ -93,6 +95,18 @@ export default function App() {
   const autoJoined = useRef(false);
   const inviteRef = useRef<HTMLDialogElement>(null);
   useWakeLock(!!net && !!game);
+  const [muted, setMuted] = useState(() => localStorage.getItem('pool.muted') === '1');
+  const { chime } = useAudio();
+  // Chime once when it's your shot or your call, as in the other games.
+  const myMove = !!game && !!net && (game.phase === 'aiming' || game.phase === 'choice') && game.activeId === net.me.id;
+  const chimeKey = myMove ? `${game!.turnStartedAt}-${game!.phase}` : null;
+  useEffect(() => {
+    if (chimeKey && !muted) chime();
+  }, [chimeKey, muted, chime]);
+  const toggleMute = () => {
+    localStorage.setItem('pool.muted', muted ? '0' : '1');
+    setMuted(!muted);
+  };
   const replay = useReplay(game);
 
   const leaveHome = useCallback((message = '') => {
@@ -119,19 +133,19 @@ export default function App() {
   const create = async (e: FormEvent) => {
     e.preventDefault();
     const player = playerName(); if (!player) return;
-    setBusy(true); setNotice('');
+    setBusy('create'); setNotice('');
     for (let attempt = 0; attempt < 3; attempt++) {
       const roomCode = randomRoomCode();
       try { enter(await TableNet.host(roomCode, identity(player, isTournament(player)), createGame(roomCode, mode, raceTo, Date.now()), events)); break; }
       catch (err) { if ((err as { type?: string }).type !== 'unavailable-id') { setNotice("Couldn't reach the matchmaking server."); break; } }
     }
-    setBusy(false);
+    setBusy(null);
   };
   const join = async (roomCode: string, player: string, watch: boolean) => {
-    setBusy(true); setNotice('');
+    setBusy('join'); setNotice('');
     try { enter(await TableNet.join(roomCode, identity(player, watch || isTournament(player)), events)); }
     catch (err) { setNotice(err instanceof Error ? err.message : "Couldn't join the room."); }
-    setBusy(false);
+    setBusy(null);
   };
   const onJoin = (e: FormEvent) => {
     e.preventDefault();
@@ -153,28 +167,42 @@ export default function App() {
     if (game) setPower(game.breakShot ? 100 : 40);
   }, [game?.turnStartedAt]);
 
-  if (!net || !game) return <main className="pool-home">
-    <nav className="room-nav"><a href="../">← Card Games</a><span>Table 04 / Eight-Ball</span></nav>
-    <div className="pool-home-grid">
-      <header className="pool-intro"><p className="pool-eyebrow">P2P / POCKET BILLIARDS</p><h1>Eight-Ball<br/><em>Pool</em></h1>
-        <p>Call your shot. Clear your group. Sink the eight. Play singles or Scotch doubles, with friends or bots.</p>
-        <div className="pool-intro-card"><span className="pool-demo-ball">8</span><div><strong>A proper match in your browser.</strong><small>Virtual table · WPA-style rules · No account</small></div></div>
-      </header>
-      <div className="pool-lobby-panel">
-        <div style={{ marginBottom: 18 }}><HowToPlay pages={RULES} /></div>
-        <label className={label} htmlFor="pool-name">Display name</label>
-        <input id="pool-name" className={field} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
-        <form onSubmit={onJoin} className="pool-form"><h2>Join a room</h2><label className={label} htmlFor="pool-code">Room code</label>
-          <input id="pool-code" className={field} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} placeholder="ABC123" autoCapitalize="characters" />
-          <div className="pool-form-actions"><button className={button.secondary} disabled={busy} value="join">Join to play</button><button className={button.quiet} disabled={busy} value="watch">Watch</button></div>
-          <p className="pool-help">Name yourself TOURNAMENT for the full display.</p></form>
-        <form onSubmit={create} className="pool-form"><h2>Create a room</h2><div className="pool-inline"><label className={label} htmlFor="pool-mode">Format<select id="pool-mode" className={field} value={mode} onChange={(e) => setMode(e.target.value as GameState['mode'])}><option value="singles">Singles · 1 v 1</option><option value="doubles">Doubles · 2 v 2</option></select></label>
-          <label className={label} htmlFor="pool-race">Match<select id="pool-race" className={field} value={raceTo} onChange={(e) => setRaceTo(Number(e.target.value))}><option value={1}>One rack</option><option value={3}>Race to 3</option><option value={5}>Race to 5</option></select></label></div>
-          <button className={button.primary} disabled={busy}>{busy ? 'Connecting…' : 'Create room'}</button>
-          <p className="pool-help">Start with one person and the empty seats become bots.</p></form>
+  if (!net || !game) return <main className="lobby">
+    <nav className="room-nav" aria-label="Game navigation"><a href="../">← Card Games</a><span>Table 04 / Eight-Ball Pool</span></nav>
+    <div className="lobby-layout">
+      <div className="lobby-column">
+        <header className="lobby-intro" data-mark="●"><p className="edition">1–4 players · Against the other team</p>
+          <h1>Eight-Ball Pool</h1>
+          <p>Call your shot, clear your group, sink the eight. Singles or Scotch doubles, with friends or bots. No sign-up.</p>
+        </header>
+        <div><HowToPlay pages={RULES} /></div>
         {notice && <p className="pool-notice" role="alert">{notice}</p>}
+        <div>
+          <label className={label} htmlFor="name">Display name</label>
+          <input id="name" className={field} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
+        </div>
+        <form onSubmit={onJoin} className="lobby-section" aria-busy={busy === 'join'}>
+          <h2>Join a room</h2>
+          <label className={label} htmlFor="code">Room code</label>
+          <div className="join-controls">
+            <input id="code" className={`${field} pool-code`} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} placeholder="6 letters or digits" autoCapitalize="characters" autoComplete="off" spellCheck={false} />
+            <button name="mode" value="join" disabled={busy !== null} className={button.primary}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
+            <button name="mode" value="watch" disabled={busy !== null} className={button.quiet}>Watch</button>
+          </div>
+          <p className="pool-help">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
+        </form>
       </div>
+      <form onSubmit={create} className="lobby-section lobby-create" aria-busy={busy === 'create'}>
+        <h2>Create a room</h2>
+        <div className="pool-inline">
+          <label className={label} htmlFor="pool-mode">Format<select id="pool-mode" className={field} value={mode} onChange={(e) => setMode(e.target.value as GameState['mode'])}><option value="singles">Singles · 1 v 1</option><option value="doubles">Doubles · 2 v 2</option></select></label>
+          <label className={label} htmlFor="pool-race">Match<select id="pool-race" className={field} value={raceTo} onChange={(e) => setRaceTo(Number(e.target.value))}><option value={1}>One rack</option><option value={3}>Race to 3</option><option value={5}>Race to 5</option></select></label>
+        </div>
+        <p className="pool-help">WPA-style rules, called shots. Start with one person and the empty seats become bots.</p>
+        <button className={`${button.secondary} pool-create`} disabled={busy !== null}>{busy === 'create' ? 'Creating room…' : 'Create room'}</button>
+      </form>
     </div>
+    <div className="lobby-foot"><span>Friends only. No money. No sign-up.</span><span>Create a room, share the link, settle in.</span></div>
   </main>;
 
   const watching = game.spectators.some((p) => p.id === net.me.id);
@@ -200,9 +228,13 @@ export default function App() {
       : game.choice?.type === 'eight-foul' ? [['spot', 'Spot 8 · cue in hand'], ['rebreak-self', 'We re-break']]
         : [['accept', 'Accept table'], ['head', 'Cue in hand']];
   return <main className="pool-room">
-    <header className="pool-header"><span style={{ display: 'flex', gap: 8 }}><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} />{game.roomCode} ▣</button><HowToPlay pages={RULES} compact /></span>
+    <header className="pool-header"><span style={{ display: 'flex', gap: 8 }}><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} />{game.roomCode}<QrCodeIcon size={18} aria-hidden /></button><HowToPlay pages={RULES} compact /></span>
       <div className="pool-header-center">Rack {game.rack || '—'} <span>·</span> {game.mode === 'doubles' ? 'Doubles' : 'Singles'} <span>·</span> Race to {game.raceTo}</div>
-      <button className={button.quiet} onClick={() => { net.leave(); netRef.current = null; leaveHome(); }}>Leave</button></header>
+      <span className="pool-header-end">
+        {game.spectators.length > 0 && <span className="pool-watchers" title={game.spectators.map((w) => w.name).join(', ')}><EyeIcon size={16} aria-hidden />{game.spectators.length}<span className="sr-only"> watching</span></span>}
+        <button className={button.quiet} onClick={toggleMute} aria-pressed={muted} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>{muted ? <SpeakerSlashIcon size={18} aria-hidden /> : <SpeakerHighIcon size={18} aria-hidden />}</button>
+        <button className={button.quiet} onClick={() => { net.leave(); netRef.current = null; leaveHome(); }} aria-label="Leave room"><SignOutIcon size={18} aria-hidden /><span className="pool-wide">Leave</span></button>
+      </span></header>
     <div className={`pool-room-body ${display ? 'pool-display' : ''}`}><section className="pool-main" aria-label="Pool table and cue controls">
       <div className="pool-scorebar"><div><strong>{labelTeam(0)}</strong><span>{watching ? `${rackOutlook(game, 0)}% outlook` : game.teams[0].group ?? 'Open'}</span></div><b>{game.teams[0].racks} : {game.teams[1].racks}</b><div><strong>{labelTeam(1)}</strong><span>{watching ? `${rackOutlook(game, 1)}% outlook` : game.teams[1].group ?? 'Open'}</span></div></div>
       <PoolTable state={game} balls={replay ?? game.balls} watching={botAim} angle={angle} power={power} tipX={tipX} tipY={tipY} active={active} placing={placing} calledBall={calledBall} calledPocket={calledPocket}

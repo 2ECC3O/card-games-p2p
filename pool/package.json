@@ -11,6 +11,7 @@
     "test": "tsx src/engine/poolEngine.test.ts && tsx src/network/network.test.ts"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

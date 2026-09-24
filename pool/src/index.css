@@ -6,39 +6,28 @@ body { margin: 0; color: #f4f0df; background: #10231b; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-.pool-home { min-height: 100dvh; background: #f2eee4; color: #202b25; padding: 0 max(4vw, 18px) 50px; }
-.pool-home-grid { max-width: 1120px; margin: auto; display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(28px, 6vw, 90px); align-items: center; }
-.pool-intro { align-self: start; padding: 22px 0; }
-.pool-eyebrow { font: 700 12px "Courier New", monospace; letter-spacing: .2em; color: #277b59; }
-.pool-intro h1 { font-size: clamp(72px, 9vw, 132px); line-height: .85; letter-spacing: -.085em; margin: 22px 0 30px; }
-.pool-intro h1 em { color: #277b59; font-family: Georgia, serif; font-weight: 400; }
-.pool-intro > p:not(.pool-eyebrow) { max-width: 34ch; line-height: 1.6; font-size: 19px; color: #526052; }
-.pool-intro-card { display: flex; align-items: center; gap: 15px; margin-top: 38px; padding: 17px; border-block: 1px solid #bdc4b5; max-width: 420px; }
-.pool-intro-card strong, .pool-intro-card small { display: block; }
-.pool-intro-card small { margin-top: 4px; color: #637263; }
-.pool-demo-ball { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #16221d; color: white; font: 800 25px Arial; box-shadow: inset -5px -6px 8px #0005; }
-.pool-lobby-panel { background: #fffdf7; padding: clamp(20px, 3vw, 34px); box-shadow: inset 0 6px #277b59, 0 18px 45px #26352815; }
-.pool-lobby-panel .room-field { width: 100%; background: #fff; color: #1f2b22; }
-.pool-lobby-panel .room-secondary { background: #277b59; color: #fff; }
-.pool-lobby-panel .room-quiet { color: #1c3f2c; border-color: #c5cfbd; }
-.pool-form { border-top: 1px solid #d8ddcf; margin-top: 23px; padding-top: 20px; }
-.pool-form h2 { font-size: 21px; font-weight: 750; margin: 0 0 13px; }
 .pool-form-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
 .pool-form-actions button { min-height: 44px; padding: 9px 16px; flex: 1; }
+.lobby-column { display: flex; flex-direction: column; gap: 16px; }
+.pool-code { font-family: "Courier New", monospace; font-size: 18px; letter-spacing: .3em; text-transform: uppercase; }
+.pool-code::placeholder { font-family: Arial, sans-serif; font-size: 15px; letter-spacing: 0; text-transform: none; }
+.pool-create { width: 100%; min-height: 48px; margin-top: 16px; }
+.lobby .pool-help { color: var(--muted); font-size: 13px; }
 .pool-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pool-inline label { display: block; }
 .pool-inline select { display: block; margin-top: 6px; }
 .pool-help { color: #748071; font-size: 12px; line-height: 1.45; margin: 8px 0 0; }
-.pool-lobby-panel > .room-label { display: block; margin-bottom: 6px; }
-.pool-form > .room-primary { min-height: 48px; width: 100%; margin-top: 18px; }
 .pool-notice { padding: 9px 12px; border-radius: 7px; background: #713d35; color: white; font-size: 14px; }
-.pool-home .pool-notice { background: #f7e2d9; color: #713d35; }
 .pool-room { min-height: 100dvh; background: #10231b; color: #f4f0df; }
 .pool-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px max(2vw, 12px); border-bottom: 1px solid #ffffff24; background: #142a21; }
 .pool-header button { min-height: 42px; padding: 7px 11px; }
 .pool-header-center { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #c6d4c7; font-size: 13px; white-space: nowrap; }
 .pool-header button { flex-shrink: 0; white-space: nowrap; }
 .pool-header-center span { color: #6f9479; padding-inline: 4px; }
+.pool-header-end { display: flex; align-items: center; gap: 8px; }
+.pool-watchers { display: flex; align-items: center; gap: 6px; color: #c6d4c7; font-size: 14px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 640px) { .pool-watchers, .pool-wide { display: none; } }
 .pool-status { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #f2bd70; }
 .pool-status[data-state=hosting], .pool-status[data-state=connected] { background: #7acb8e; }
 .pool-status[data-state=reconnecting] { background: #e77070; }
@@ -121,5 +110,5 @@ button:disabled { cursor: not-allowed; }
 .pool-invite > div { width: 100%; display: flex; gap: 8px; }
 .pool-invite > div button { flex: 1; min-height: 44px; }
 .pool-code-qr { width: 80px; height: 80px; background: white; padding: 4px; border-radius: 4px; }
-@media (max-width: 900px) { .pool-home-grid { grid-template-columns: 1fr; gap: 22px; } .pool-intro h1 { font-size: clamp(64px, 13vw, 100px); } .pool-room-body.pool-display { display: block; } .pool-tournament { border-left: 0; border-top: 1px solid #ffffff23; } .pool-feed { max-height: none; } }
-@media (max-width: 600px) { .pool-home { padding-inline: 16px; } .room-nav { min-height: 60px; margin-bottom: 15px; } .pool-intro { padding: 8px 0; } .pool-intro h1 { margin: 12px 0 18px; } .pool-intro-card { margin-top: 18px; } .pool-lobby-panel { padding: 18px; } .pool-header-center { font-size: 11px; text-align: center; } .pool-header button { font-size: 12px; } .pool-scorebar { margin-bottom: 0; } .pool-scorebar strong { font-size: 11px; max-width: 32vw; } .pool-scorebar span { font-size: 9px; } .pool-scorebar b { font-size: 18px; } .pool-main { padding-inline: 6px; } .pool-event { font-size: 12px; padding-inline: 8px; } .pool-controls { padding: 12px; margin-inline: 6px; } .pool-control-grid { grid-template-columns: 1fr; gap: 12px; } .pool-call { flex-wrap: wrap; } .pool-call > label:not(.pool-safety) { min-width: 40%; } .pool-fine span { width: 100%; } .pool-tournament { padding: 16px; } }
+@media (max-width: 900px) { .pool-room-body.pool-display { display: block; } .pool-tournament { border-left: 0; border-top: 1px solid #ffffff23; } .pool-feed { max-height: none; } }
+@media (max-width: 600px) { .pool-header-center { font-size: 11px; text-align: center; } .pool-header button { font-size: 12px; } .pool-scorebar { margin-bottom: 0; } .pool-scorebar strong { font-size: 11px; max-width: 32vw; } .pool-scorebar span { font-size: 9px; } .pool-scorebar b { font-size: 18px; } .pool-main { padding-inline: 6px; } .pool-event { font-size: 12px; padding-inline: 8px; } .pool-controls { padding: 12px; margin-inline: 6px; } .pool-control-grid { grid-template-columns: 1fr; gap: 12px; } .pool-call { flex-wrap: wrap; } .pool-call > label:not(.pool-safety) { min-width: 40%; } .pool-fine span { width: 100%; } .pool-tournament { padding: 16px; } }
