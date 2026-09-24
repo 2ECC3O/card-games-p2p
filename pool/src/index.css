@@ -9,8 +9,8 @@ button:disabled { cursor: not-allowed; }
 .pool-form-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
 .pool-form-actions button { min-height: 44px; padding: 9px 16px; flex: 1; }
 .lobby-column { display: flex; flex-direction: column; gap: 16px; }
-.pool-code { font-family: "Courier New", monospace; font-size: 18px; letter-spacing: .3em; text-transform: uppercase; }
-.pool-code::placeholder { font-family: Arial, sans-serif; font-size: 15px; letter-spacing: 0; text-transform: none; }
+.lobby-code { font-family: "Courier New", monospace; font-size: 18px; letter-spacing: .3em; text-transform: uppercase; }
+.lobby-code::placeholder { font-family: Arial, sans-serif; font-size: 15px; letter-spacing: 0; text-transform: none; }
 .pool-create { width: 100%; min-height: 48px; margin-top: 16px; }
 .lobby .pool-help { color: var(--muted); font-size: 13px; }
 .pool-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

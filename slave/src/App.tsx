@@ -2,15 +2,15 @@ import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } f
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import HandControls from './components/HandControls';
 import SlaveTable from './components/SlaveTable';
-import InviteCard from './components/InviteCard';
-import HowToPlay from './components/HowToPlay';
+import InviteCard from '../../shared/InviteCard';
+import HowToPlay from '../../shared/HowToPlay';
 import { RULES } from './components/rules';
 import Tournament from './components/Tournament';
-import { button, field, label } from './components/ui';
+import { button, field, label } from '../../shared/ui';
 import type { GameState } from './types/slave';
 import { createGame, MAX_SEATS, MIN_TABLE, odds } from './engine/slaveEngine';
-import { useAudio } from './hooks/useAudio';
-import { useWakeLock } from './hooks/useWakeLock';
+import { useAudio } from '../../shared/useAudio';
+import { useWakeLock } from '../../shared/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
 
 const randomHex = (bytes: number) =>
@@ -185,7 +185,7 @@ export default function App() {
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Slave
               </h1>
-              <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
+              <p className="mt-2 max-w-[38ch] text-balance lg:mt-3 lg:text-lg">
                 Slave, the Thai climbing game. Empty your hand first to be King; come last and you're the Slave. No sign-up.
               </p>
             </header>
@@ -194,10 +194,10 @@ export default function App() {
             </div>
 
             {inAppHint && (
-              <div className="rise-in flex items-start gap-3 rounded-xl bg-slate-900/80 px-3.5 py-3 text-sm text-slate-200 ring-1 ring-white/15" role="note">
+              <div className="rise-in flex items-start gap-3 rounded-xl px-3.5 py-3 text-sm" role="note">
                 <p className="flex-1">
                   You're in an app's built-in browser, which can block the connection to other players. Open this page in Safari or
-                  Chrome instead: use the app's menu and choose <span className="font-semibold text-slate-50">Open in browser</span>.
+                  Chrome instead: use the app's menu and choose <span className="font-semibold">Open in browser</span>.
                 </p>
                 <button onClick={() => setInAppHint(false)} className={`${button.quiet} min-h-9 shrink-0 px-3 text-sm`}>
                   Dismiss
@@ -206,7 +206,7 @@ export default function App() {
             )}
 
             {notice && (
-              <p className="rise-in rounded-xl bg-amber-300/10 px-3.5 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30" role="alert">
+              <p className="rise-in rounded-xl px-3.5 py-2.5 text-sm" role="alert">
                 {notice}
               </p>
             )}
@@ -242,13 +242,13 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
+              <p className="mt-2 text-sm text-(--muted)">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
             </form>
           </div>
 
           <form onSubmit={createRoom} className={`${card} lobby-create`} aria-busy={busy === 'create'}>
             <h2 className="mb-3 text-lg font-semibold">Create a room</h2>
-            <p className="text-sm text-slate-400">One deck, no jokers, 2 high. Up to 8 players; bots fill the table to 4 when you start. Titles and the card exchange carry over from round to round.</p>
+            <p className="text-sm text-(--muted)">One deck, no jokers, 2 high. Up to 8 players; bots fill the table to 4 when you start. Titles and the card exchange carry over from round to round.</p>
 
             <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
               {busy === 'create' ? 'Creating room…' : 'Create room'}

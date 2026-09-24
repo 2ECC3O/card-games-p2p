@@ -20,16 +20,17 @@ Keep the page open while you play: the game runs in the players' browsers.
 
 ## Run it on your own computer
 
-Needs [Node.js](https://nodejs.org) 20.19 or newer. From this `roulette` folder:
+Needs [Node.js](https://nodejs.org) 20.19 or newer. From the repository root, install once for every game, then
+start this one:
 
 ```bash
 npm install
-npm run dev
+npm run dev -w roulette
 ```
 
-Then open the address it prints. `npm test` runs the engine and network checks; `npm run build` makes the
-static site in `dist/`. Hosting and the optional TURN relay in `.env.example` work exactly as described in
-the [Hold'em README](../poker/README.md).
+Then open the address it prints. `npm test -w roulette` runs the engine checks (`npm test` at the root runs every
+game's plus the shared network checks); `npm run build -w roulette` makes the static site in `roulette/dist/`. Hosting and the optional TURN relay in the root `.env.example` work
+exactly as described in the [Hold'em README](../poker/README.md).
 
 ## How to play
 
@@ -54,15 +55,15 @@ Same design as Blackjack P2P:
 
 - `src/engine/rouletteEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
   The number is drawn with `crypto.getRandomValues` when betting closes.
-- `src/network/tableNet.ts`: PeerJS rooms. The host checks every bet, then sends everyone the table (nothing
+- `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
+  its room prefix and the shape of a valid move. The host checks every bet, then sends everyone the table (nothing
   is hidden in roulette). A standby player holds a snapshot and takes over if the host drops; reload
   reconnects to your seat within 60 seconds.
-- `src/network/codec.ts`: compressed messages with size limits.
 - `src/components/RouletteTable.tsx`, `ActionControls.tsx`: the wheel, the board, and the chip controls.
   Each screen spins its own wheel when it hears the result and shows the outcome once it stops.
 
 Timings and limits live at the top of the engine (`BET_MS`, `SPIN_MS`, `SETTLE_MS`, `MAX_SEATS`).
-When the wire format changes, bump `PREFIX` in `tableNet.ts` so old and new pages never share a room.
+When the wire format changes, bump `prefix` in `src/network/tableNet.ts` so old and new pages never share a room.
 
 ## License
 

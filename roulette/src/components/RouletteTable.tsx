@@ -31,7 +31,7 @@ const colorOf = (n: number) => (n === 0 || n === DOUBLE_ZERO ? 'Green' : RED.has
 export const resultName = (n: number) => (n === 0 ? 'Zero' : n === DOUBLE_ZERO ? 'Double zero' : `${colorOf(n)} ${n}`);
 const TONE = { Green: 'bg-emerald-700', Red: 'bg-red-600', Black: 'bg-slate-950' };
 /** One colour per seat, so everyone can see whose chips are where. Light enough to read on red, black and green. */
-export const PLAYER_COLORS = ['#38bdf8', '#a3e635', '#e879f9', '#fb923c', '#a78bfa', '#fde047', '#34d399', '#f9a8d4', '#f8fafc', '#94a3b8'];
+const PLAYER_COLORS = ['#38bdf8', '#a3e635', '#e879f9', '#fb923c', '#a78bfa', '#fde047', '#34d399', '#f9a8d4', '#f8fafc', '#94a3b8'];
 export const playerColor = (seat: number) => PLAYER_COLORS[seat % PLAYER_COLORS.length];
 const short = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : `${n}`);
 

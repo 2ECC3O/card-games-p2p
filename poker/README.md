@@ -51,12 +51,12 @@ You only need this if you want to change the game or host your own copy. To just
 - or, without Git: on https://github.com/2ECC3O/card-games-p2p press **Code > Download ZIP**, unzip it, and
   open a terminal in its `poker` folder.
 
-**3. Install and start it:**
+**3. Install and start it** (from the repository root, not the `poker` folder):
 ```bash
 npm install
 ```
 ```bash
-npm run dev
+npm run dev -w poker
 ```
 
 **4. Open http://localhost:5173** in your browser. The game reloads by itself when you edit the code.
@@ -65,9 +65,10 @@ Press `Ctrl+C` in the terminal to stop it.
 Other commands:
 
 ```bash
-npm test         # engine and codec self-checks (dealing, betting rules, side pots, chip conservation)
-npm run build    # type-check and build the finished site into dist/
-npm run preview  # serve the built dist/ locally
+npm test -w poker         # engine self-checks (dealing, betting rules, side pots, chip conservation)
+npm test                  # every game's checks plus the shared codec and SHA-256 checks
+npm run build -w poker    # type-check and build the finished site into poker/dist/
+npm run preview -w poker  # serve the built dist/ locally
 ```
 
 ---
@@ -143,8 +144,8 @@ To set it up for your own deployment:
    ```
 3. Run the **Deploy to GitHub Pages** workflow again (Actions tab), or push a commit.
 
-For a local build, put the same values in `.env` as `VITE_OPENRELAY_APP` and `VITE_OPENRELAY_API_KEY`
-(see `.env.example`).
+For a local build, put the same values in a `.env` at the repository root as `VITE_OPENRELAY_APP` and
+`VITE_OPENRELAY_API_KEY` (see the root `.env.example`); every game reads it.
 
 The API key ends up in the site's JavaScript, where anyone can read it. On the free plan the worst case is
 someone using up the monthly allowance, after which relayed players can't connect until it resets; there
@@ -213,7 +214,7 @@ Things phones do differently:
 - **Clients** send their actions (fold, call, raise, rejoin, leave) to the host. The host checks them
   against the rules and sends every player their own view of the new state.
 - **Messages are compressed** (JSON packed with the browser's built-in `CompressionStream`, see
-  `src/network/codec.ts`). A 10-player game state shrinks from about 5.5 KB to under 1 KB, which keeps
+  `shared/codec.ts`). A 10-player game state shrinks from about 5.5 KB to under 1 KB, which keeps
   relay (TURN) usage and mobile data low: measured at roughly 40 KB per player per hand, both directions,
   including network overhead. Messages over 64 KB compressed or 1 MB unpacked are dropped, so nobody can
   crash a tab with a "decompression bomb".
@@ -243,7 +244,7 @@ the secrets themselves, so it can't be used to take over someone else's seat.
 
 Each tab gets a random id and secret, stored in `sessionStorage`. Reloading the tab sends the same id and
 secret, so the host puts you back in your seat. Someone else can't take your seat with your id, because
-the secret won't match. The host keeps only a SHA-256 fingerprint of each secret (`src/network/sha256.ts`,
+the secret won't match. The host keeps only a SHA-256 fingerprint of each secret (`shared/sha256.ts`,
 plain JavaScript so it also works on `http://` pages). Your display name and mute setting are kept in
 `localStorage`. Names are cleaned of invisible and text-reversing characters before anyone sees them.
 
@@ -267,28 +268,31 @@ plain JavaScript so it also works on `http://` pages). Your display name and mut
 | `src/types/poker.ts` | Types: cards, players, pots, game state, actions |
 | `src/engine/pokerEngine.ts` | The rules. Pure functions: deal, betting rounds, side pots (`buildPots`), showdown, turn timeouts (`hostTick`), per-player masking (`maskFor`) |
 | `src/engine/pokerEngine.test.ts` | Engine checks (rules, side pots, hand rankings, names), run with `npm test` |
-| `src/network/iceServers.ts` | Which STUN and relay (TURN) servers browsers use, including fetching Open Relay credentials |
-| `src/network/codec.ts` | Compresses and decompresses messages between browsers, with size limits |
-| `src/network/sha256.ts` | SHA-256, for fingerprinting reconnect secrets |
-| `src/network/network.test.ts` | Checks for the codec, its size limits and SHA-256, run with `npm test` |
-| `src/network/pokerNet.ts` | Host and client networking: message checks, heartbeats, standby snapshots, failover, reconnects |
+| `src/network/pokerNet.ts` | Hold'em's side of the shared room: the engine, the room prefix and the shape of a valid move |
+| `../shared/tableNet.ts` | Host and client networking for every game: message checks, heartbeats, standby snapshots, failover, reconnects |
+| `../shared/iceServers.ts` | Which STUN and relay (TURN) servers browsers use, including fetching Open Relay credentials |
+| `../shared/codec.ts` | Compresses and decompresses messages between browsers, with size limits |
+| `../shared/sha256.ts` | SHA-256, for fingerprinting reconnect secrets |
+| `../shared/network.test.ts` | Checks for the codec, its size limits and SHA-256, run with `npm test` at the root |
+| `../shared/lobby.ts` | Seat-free room housekeeping every engine shares: names, randomness, spectators, connection flags |
 | `src/App.tsx` | Home screen (create/join), table screen header and footer, invite dialog, notices |
 | `src/components/PokerTable.tsx` | The table: seats around the felt, board cards, chips, pots, turn timers, showdown results |
 | `src/components/ActionControls.tsx` | Fold / Check / Call / Raise panel with the raise slider |
-| `src/components/InviteCard.tsx` | Room code, QR code and share button |
-| `src/components/ui.ts` | Shared button and form styles |
-| `src/hooks/useAudio.ts` | The "your turn" chime, switched on by the first tap (needed on iPhones) |
-| `src/hooks/useWakeLock.ts` | Keeps the screen on while at a table |
-| `src/index.css` | Fonts, Tailwind setup and the animations (card deals, chips, pots) |
-| `../.github/workflows/deploy.yml` | Tests, builds and publishes both games to GitHub Pages on every push to `main` |
+| `../shared/InviteCard.tsx` | Room code, QR code and share button |
+| `../shared/TournamentPanel.tsx` | The TOURNAMENT display's side panel: join QR, leaderboard, live feed |
+| `../shared/ui.ts` | Shared button and form styles |
+| `../shared/useAudio.ts` | The "your turn" chime, switched on by the first tap (needed on iPhones) |
+| `../shared/useWakeLock.ts` | Keeps the screen on while at a table |
+| `src/index.css` | Tailwind setup and the animations (card deals, chips, pots) |
+| `../.github/workflows/deploy.yml` | Tests, builds and publishes every game to GitHub Pages on every push to `main` |
 | `../.github/dependabot.yml` | Keeps the workflow's pinned actions up to date |
 
-Built with React 18, TypeScript, Vite, Tailwind CSS 4, PeerJS, `pokersolver`, `qrcode.react`,
-Phosphor icons and the Geist font (bundled with the app, no external font requests).
+Built with React 18, TypeScript, Vite, Tailwind CSS 4, PeerJS, `pokersolver`, `qrcode.react` and
+Phosphor icons. Text uses the system fonts from `room.css`; nothing is downloaded.
 
 ### Timings and limits
 
-These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.ts`:
+These live at the top of `src/engine/pokerEngine.ts`, `../shared/tableNet.ts` and `../shared/lobby.ts`:
 
 | Setting | Value |
 |---|---|
@@ -306,8 +310,8 @@ These live at the top of `src/engine/pokerEngine.ts` and `src/network/pokerNet.t
 - **Rules or payouts:** edit `pokerEngine.ts`, then add or update a check in `pokerEngine.test.ts` and run
   `npm test`. The random-play check at a full 10-seat table catches chips being created or lost.
 - **Message format:** clients and the host must run the same version. If you change messages in
-  `pokerNet.ts` in a way older versions can't read, change the `PREFIX` (currently `p2p-holdem-v5-`) so old and new
-  versions can't join each other's rooms.
+  `../shared/tableNet.ts` or `pokerNet.ts` in a way older versions can't read, change the `prefix` in `pokerNet.ts`
+  (currently `p2p-holdem-v6-`) so old and new versions can't join each other's rooms.
 - **Look and layout:** everything is Tailwind classes in the components. `tall:` in class names means "wide
   and tall screen" (defined in `index.css`), used so short laptop screens keep the mid-size table.
 
@@ -342,5 +346,5 @@ Found a problem? Open an issue on GitHub.
 
 ## License
 
-The code is released under the [MIT License](../LICENSE). The bundled Geist and Geist Mono fonts are under the
-SIL Open Font License 1.1, and each dependency keeps its own license (all permissive: MIT or ISC).
+The code is released under the [MIT License](../LICENSE). Each dependency keeps its own license (all
+permissive: MIT or ISC).

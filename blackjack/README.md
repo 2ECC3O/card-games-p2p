@@ -20,17 +20,18 @@ Keep the page open while you play: the game runs in the players' browsers.
 
 ## Run it on your own computer
 
-Needs [Node.js](https://nodejs.org) 20.19 or newer. From this `blackjack` folder:
+Needs [Node.js](https://nodejs.org) 20.19 or newer. From the repository root, install once for every game, then
+start this one:
 
 ```bash
 npm install
-npm run dev
+npm run dev -w blackjack
 ```
 
-Then open the address it prints. `npm test` runs the engine and network checks; `npm run build` makes the
-static site in `dist/`. Hosting options (same Wi-Fi, static hosts, the optional TURN relay in
-`.env.example`) work exactly as described in the [Hold'em README](../poker/README.md); the workflow at the
-repository root publishes both games to Pages on every push to `main`.
+Then open the address it prints. `npm test -w blackjack` runs the engine checks (`npm test` at the root runs every
+game's plus the shared network checks); `npm run build -w blackjack` makes the static site in `blackjack/dist/`. Hosting options (same Wi-Fi, static hosts, the optional TURN relay in
+the root `.env.example`) work exactly as described in the [Hold'em README](../poker/README.md); the workflow at
+the repository root publishes every game to Pages on every push to `main`.
 
 ## How to play
 
@@ -59,14 +60,14 @@ repository root publishes both games to Pages on every push to `main`.
 Same design as Hold'em P2P:
 
 - `src/engine/blackjackEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
-- `src/network/tableNet.ts`: PeerJS rooms. The host checks every action, then sends each player their view
+- `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
+  its room prefix and the shape of a valid move. The host checks every action, then sends each player their view
   (`maskFor`: no shoe, and the dealer's hole card face down until the dealer plays). A standby player holds
   a snapshot and takes over if the host drops; reload reconnects to your seat within 60 seconds.
-- `src/network/codec.ts`: compressed messages with size limits.
 - `src/components/BlackjackTable.tsx`, `ActionControls.tsx`: the table and the bet / play controls.
 
 Timings and limits live at the top of the engine (`BET_MS`, `TURN_MS`, `SETTLE_MS`, `MAX_SEATS`, `MAX_HANDS`).
-When the wire format changes, bump `PREFIX` in `tableNet.ts` so old and new pages never share a room.
+When the wire format changes, bump `prefix` in `src/network/tableNet.ts` so old and new pages never share a room.
 
 ## License
 

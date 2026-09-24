@@ -5,7 +5,7 @@
 export type Spot = `n${number}` | 'red' | 'black' | 'odd' | 'even' | 'low' | 'high' | 'd1' | 'd2' | 'd3' | 'c1' | 'c2' | 'c3';
 
 /** waiting: nobody seated. betting: everyone places chips. settled: the wheel has spun, results on show. */
-export type Phase = 'waiting' | 'betting' | 'settled';
+type Phase = 'waiting' | 'betting' | 'settled';
 
 export interface TableConfig {
   startingStack: number;
@@ -30,7 +30,7 @@ export interface Player {
   connected: boolean;
 }
 
-export interface QueuedPlayer {
+interface QueuedPlayer {
   id: string;
   name: string;
   connected: boolean;

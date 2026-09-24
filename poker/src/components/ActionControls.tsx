@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { legalActions } from '../engine/pokerEngine';
 import type { GameState, PlayerAction } from '../types/poker';
-import { button } from './ui';
+import { button } from '../../../shared/ui';
 
 interface Props {
   state: GameState;

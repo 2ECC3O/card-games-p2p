@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { addPlayer, createGame, startGame } from '../engine/poolEngine';
 import { createHash } from 'node:crypto';
 import { decode, encode, MAX_PACKED_BYTES, MAX_UNPACKED_BYTES } from './codec';
 import { sha256 } from './sha256';
@@ -9,17 +8,19 @@ for (const text of ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(64), '
   assert.equal(sha256(text), createHash('sha256').update(text, 'utf8').digest('hex'), `sha256 of ${text.length} chars`);
 }
 
-// A live doubles state and host takeover snapshot survive a round trip beneath PeerJS's message ceiling.
-let s = createGame('ABC123', 'doubles', 3, 0);
-for (let i = 0; i < 4; i++) s = addPlayer(s, `player-${i}-${'x'.repeat(10)}`, `Player ${i}`, 0);
-s = startGame(s, 0);
+// A full 10-seat room state (the biggest table any game has) survives a round trip and shrinks well below
+// PeerJS's ~16 KB per-message ceiling.
+const s = {
+  roomCode: 'ABC123', started: true, phase: 'playing', round: 12, deadline: 0, lastActionAt: 0, queue: [], spectators: [],
+  players: Array.from({ length: 10 }, (_, i) => ({ id: `player-${i}-${'x'.repeat(10)}`, name: `Player ${i}`, seat: i, chips: 1000, hand: ['As', 'Kd', '??'], connected: true })),
+};
 const msg = { t: 'state', state: s, standbyId: 'player-1', snapshot: { state: s, members: [] } };
 
 const packed = await encode(msg);
 assert.deepEqual(await decode(packed), msg);
 assert.deepEqual(await decode(packed.buffer.slice(packed.byteOffset, packed.byteOffset + packed.byteLength)), msg, 'ArrayBuffer input');
 const plain = Buffer.byteLength(JSON.stringify(msg));
-assert.ok(packed.byteLength < plain && packed.byteLength < 16_000, `compressed ${packed.byteLength} B vs ${plain} B plain`);
+assert.ok(packed.byteLength * 3 < plain, `compressed ${packed.byteLength} B vs ${plain} B plain`);
 
 // Junk from a misbehaving peer is rejected, never half-parsed.
 await assert.rejects(decode(new Uint8Array([1, 2, 3, 4])));

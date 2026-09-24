@@ -48,18 +48,27 @@ own engine and table, in plum.
 
 ## Run it on your own computer
 
-Needs [Node.js](https://nodejs.org) 20.19 or newer. From this folder: `npm install`, then `npm run dev`.
-`npm test` runs the engine and network checks; `npm run build` makes the static site in `dist/`.
+Needs [Node.js](https://nodejs.org) 20.19 or newer. From the repository root, install once for every game, then
+start this one:
+
+```bash
+npm install
+npm run dev -w slave
+```
+
+Then open the address it prints. `npm test -w slave` runs the engine checks (`npm test` at the root runs every
+game's plus the shared network checks); `npm run build -w slave` makes the static site in `slave/dist/`.
 
 ## How it works
 
 - `src/engine/slaveEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
-- `src/network/tableNet.ts`: PeerJS rooms, as in the other games. `maskFor` hides every hand but your own, and
+- `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
+  its room prefix and the shape of a valid move. `maskFor` hides every hand but your own, and
   exchanges you're not part of. Spectators see everything.
 - `src/components/SlaveTable.tsx`, `HandControls.tsx`: the table, and your hand with its play, pass and give
   buttons.
 
-Bump `PREFIX` in `tableNet.ts` when the wire format changes.
+Bump `prefix` in `src/network/tableNet.ts` when the wire format changes.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { Tag, type Page } from './HowToPlay';
+import { Tag, type Page } from '../../../shared/HowToPlay';
 
 const COLOR = { red: '#b3261e', black: '#1d1f1e', green: '#1f7a4a' };
 /** A wheel pocket for the pictures. */

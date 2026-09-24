@@ -83,30 +83,33 @@ Each game's own README has the full rules and details:
 | `pool/` | eight-ball pool, same peer-to-peer room pattern |
 | `pokdeng/` | Pok Deng, a copy of blackjack's app with its own engine, in yellow |
 | `slave/` | Slave, a copy of Pok Deng's app with its own engine, in plum |
+| `shared/` | what every game uses: the peer-to-peer room (`tableNet.ts`), message compression, relay setup, lobby helpers, the How to play guide, invite card, TOURNAMENT panel, chime and wake lock |
+| `room.css` | the shared card-room look |
 | `index.html` | the game picker page at the root of the site |
+| `package.json` | the npm workspace: one install and one lockfile for every game |
 | `.github/workflows/deploy.yml` | tests, builds and publishes everything |
 
-Each game is its own app with its own `package.json`. They don't share code; blackjack started as a
-copy of Hold'em's networking and styling, roulette and Pok Deng as copies of blackjack's, and pool follows the same room pattern.
+Each game is a Vite app in its own folder with its own engine, table and controls. Everything the games have in
+common lives once in `shared/`, which each game imports by relative path, like `room.css`. A game plugs into the
+shared room through a small `src/network/tableNet.ts` that hands over its engine, room prefix and move checks.
 
 ### Run a game on your computer
 
 Needs [Node.js](https://nodejs.org) 20.19 or newer.
 
 ```bash
-cd poker
 npm install
-npm run dev
+npm run dev -w poker
 ```
 
-Open http://localhost:5173. Use `cd blackjack`, `cd roulette`, `cd pool`, or `cd pokdeng` for the other games.
+Open the address it prints. Use `-w blackjack`, `-w roulette`, `-w pool`, `-w pokdeng` or `-w slave` for the other games.
 
-`npm test` runs the rule and network checks. `npm run build` makes the finished site in `dist/`.
+`npm test` runs every game's rule checks and the shared network checks. `npm run build` builds every game into its `dist/`.
 
 ### Visual design
 
 The game picker is plain HTML and CSS, with no JavaScript, downloaded fonts or image assets.
-All five games import `room.css` for the shared room setup, controls and the How to play guide. Each game keeps its guide pages in `src/components/rules.tsx`; `HowToPlay.tsx` is the same file in every game.
+All six games import `room.css` for the shared room setup, controls and the How to play guide. Each game keeps its guide pages in `src/components/rules.tsx`; the guide itself is `shared/HowToPlay.tsx`.
 Their existing card, chip and wheel animations remain in each game's stylesheet.
 Keep the green poker, blue blackjack, red roulette, green felt pool, yellow Pok Deng and plum Slave accents, and check layouts at 375 × 667.
 

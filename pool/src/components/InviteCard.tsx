@@ -1,6 +1,6 @@
 import { QRCodeSVG } from 'qrcode.react';
 import type { ReactNode } from 'react';
-import { button } from './ui';
+import { button } from '../../../shared/ui';
 
 interface Props {
   code: string;

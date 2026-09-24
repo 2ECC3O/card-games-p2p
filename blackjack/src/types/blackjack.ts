@@ -1,10 +1,10 @@
-export type Suit = 's' | 'h' | 'd' | 'c';
-export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'T' | 'J' | 'Q' | 'K' | 'A';
+type Suit = 's' | 'h' | 'd' | 'c';
+type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'T' | 'J' | 'Q' | 'K' | 'A';
 /** "As", "Td"; "??" is the dealer's face-down card. */
 export type Card = `${Rank}${Suit}` | '??';
 
 /** waiting: not enough players. betting: everyone places a bet. playing: players act in seat order. settled: results on show. */
-export type Phase = 'waiting' | 'betting' | 'playing' | 'settled';
+type Phase = 'waiting' | 'betting' | 'playing' | 'settled';
 
 export interface TableConfig {
   startingStack: number;
@@ -39,7 +39,7 @@ export interface Player {
   left: boolean;
 }
 
-export interface QueuedPlayer {
+interface QueuedPlayer {
   id: string;
   name: string;
   connected: boolean;

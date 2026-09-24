@@ -1,6 +1,6 @@
 import { staked } from '../engine/rouletteEngine';
 import type { GameState, PlayerAction } from '../types/roulette';
-import { button } from './ui';
+import { button } from '../../../shared/ui';
 
 /** Chip values, in minimum bets. */
 export const CHIPS = [1, 5, 25, 100] as const;

@@ -16,4 +16,4 @@ The physics is a 2D model with sliding and rolling friction, so stun, draw and f
 
 ## Local development
 
-Requires Node.js 20.19 or newer. Run `npm ci`, `npm test`, and `npm run build` in this folder. `npm run dev` starts Vite. Like the other games, publishing occurs through the root GitHub Pages workflow.
+Requires Node.js 20.19 or newer. From the repository root run `npm install` once, then `npm run dev -w pool`; `npm test -w pool` and `npm run build -w pool` test and build it. The room, How to play guide, chime and wake lock come from `../shared/`. Like the other games, publishing occurs through the root GitHub Pages workflow.

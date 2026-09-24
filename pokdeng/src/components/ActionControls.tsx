@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { catchable, handsOf, LIMITS, MAX_LEGS, mustDraw, score } from '../engine/pokDengEngine';
 import type { GameState, PlayerAction } from '../types/pokdeng';
-import { button, field } from './ui';
+import { button, field } from '../../../shared/ui';
 
 interface Props {
   state: GameState;

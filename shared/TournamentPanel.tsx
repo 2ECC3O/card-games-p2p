@@ -7,18 +7,23 @@ export interface TickerLine {
   delay?: number;
 }
 
+/** One leaderboard row. The board ranks by `score`; everything else is optional, per game. */
 export interface Leader {
   id: string;
   name: string;
-  /** Everything the player has, including chips riding on the current round. */
-  chips: number;
   connected: boolean;
-  /** Optional marker colour (roulette's player colours). */
+  /** Chips (everything the player has, stakes included) or points. */
+  score: number;
+  /** Gain or loss since the start, shown as +/−; chip games only. */
+  change?: number;
+  /** Second line under the name, e.g. past hands won. */
+  detail?: string;
+  /** Short note beside the name, e.g. a title and cards left. */
+  note?: string;
+  /** Live odds, already worded ("Stand ~34%", "King ~12%"). */
+  chance?: string;
+  /** Marker colour (roulette's player colours). */
   color?: string;
-  handsPlayed: number;
-  handsWon: number;
-  equity?: number;
-  exact?: boolean;
 }
 
 interface Entry {
@@ -52,9 +57,14 @@ export function useTicker<S>(state: S, describe: (prev: S, next: S) => TickerLin
 
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-/** The side panel of the TOURNAMENT display: how to join, chip counts, and the live feed. */
-export default function TournamentPanel({ code, url, leaders, startingStack, feed }: { code: string; url: string; leaders: Leader[]; startingStack: number; feed: Entry[] }) {
-  const ranked = [...leaders].sort((a, b) => b.chips - a.chips);
+/** The side panel of the TOURNAMENT display: how to join, the leaderboard, and the live feed. */
+export default function TournamentPanel({ code, url, heading, chanceTitle, leaders, feed }: {
+  code: string; url: string; heading: string;
+  /** Tooltip explaining the odds. */
+  chanceTitle?: string;
+  leaders: Leader[]; feed: Entry[];
+}) {
+  const ranked = [...leaders].sort((a, b) => b.score - a.score);
   return (
     <aside className="flex shrink-0 flex-col gap-5 border-t border-white/10 bg-slate-950/70 p-4 lg:min-h-0 lg:w-80 lg:overflow-y-auto lg:border-t-0 lg:border-l xl:w-96 xl:p-5">
       <div className="flex items-center gap-4">
@@ -68,31 +78,29 @@ export default function TournamentPanel({ code, url, leaders, startingStack, fee
       </div>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Chip counts · Live win chance</h2>
+        <h2 className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">{heading}</h2>
         {ranked.length === 0 ? (
           <p className="text-sm text-slate-400">Nobody seated yet.</p>
         ) : (
           <ol className="space-y-1">
-            {ranked.map((p, i) => {
-              const change = p.chips - startingStack;
-              return (
-                <li key={p.id} className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 xl:text-lg ${i === 0 ? 'bg-white/8' : ''} ${p.connected ? '' : 'opacity-50'}`}>
-                  <span className="w-5 text-right font-mono text-sm text-slate-400">{i + 1}</span>
-                  {p.color && <span className="size-3 shrink-0 rounded-full ring-1 ring-slate-950/80" style={{ backgroundColor: p.color }} aria-hidden />}
-                  <span className="min-w-0 flex-1 font-medium">
-                    <span className="block truncate">{p.name}</span>
-                    <span className="block text-xs font-normal text-slate-400" title="Completed hands won, including ties, divided by completed hands dealt">
-                      {p.handsPlayed ? `${Math.round((100 * p.handsWon) / p.handsPlayed)}% · ${p.handsWon}/${p.handsPlayed} past hands` : 'No past hands'}
-                    </span>
+            {ranked.map((p, i) => (
+              <li key={p.id} className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 xl:text-lg ${i === 0 ? 'bg-white/8' : ''} ${p.connected ? '' : 'opacity-50'}`}>
+                <span className="w-5 text-right font-mono text-sm text-slate-400">{i + 1}</span>
+                {p.color && <span className="size-3 shrink-0 rounded-full ring-1 ring-slate-950/80" style={{ backgroundColor: p.color }} aria-hidden />}
+                <span className="min-w-0 flex-1 font-medium">
+                  <span className="block truncate">{p.name}</span>
+                  {p.detail && <span className="block text-xs font-normal text-slate-400">{p.detail}</span>}
+                </span>
+                {p.note && <span className="text-xs text-slate-400 xl:text-sm">{p.note}</span>}
+                {p.chance && <span className="font-mono text-xs font-semibold text-amber-200 xl:text-sm" title={chanceTitle}>{p.chance}</span>}
+                <span className="font-mono font-semibold">{p.score}</span>
+                {p.change !== undefined && (
+                  <span className={`w-14 text-right font-mono text-xs xl:text-sm ${p.change > 0 ? 'text-emerald-300' : p.change < 0 ? 'text-rose-300' : 'text-slate-500'}`}>
+                    {p.change > 0 ? `+${p.change}` : p.change < 0 ? `−${-p.change}` : '±0'}
                   </span>
-                  {p.equity !== undefined && <span className="font-mono text-xs font-semibold text-amber-200" title="Chance of winning this hand; ties split the chance">{p.exact ? '' : '~'}{Math.round(p.equity * 100)}%</span>}
-                  <span className="font-mono font-semibold">{p.chips}</span>
-                  <span className={`w-14 text-right font-mono text-xs xl:text-sm ${change > 0 ? 'text-emerald-300' : change < 0 ? 'text-rose-300' : 'text-slate-500'}`}>
-                    {change > 0 ? `+${change}` : change < 0 ? `−${-change}` : '±0'}
-                  </span>
-                </li>
-              );
-            })}
+                )}
+              </li>
+            ))}
           </ol>
         )}
       </section>

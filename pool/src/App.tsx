@@ -3,13 +3,13 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import PoolTable from './components/PoolTable';
 import TournamentPanel from './components/TournamentPanel';
 import InviteCard from './components/InviteCard';
-import HowToPlay from './components/HowToPlay';
+import HowToPlay from '../../shared/HowToPlay';
 import { RULES } from './components/rules';
-import { button, field, label } from './components/ui';
+import { button, field, label } from '../../shared/ui';
 import { createGame, isBot, rackOutlook, SHOT_CLOCK_MS } from './engine/poolEngine';
 import { FRAME_EVERY, HZ, simulate } from './engine/physics';
-import { useAudio } from './hooks/useAudio';
-import { useWakeLock } from './hooks/useWakeLock';
+import { useAudio } from '../../shared/useAudio';
+import { useWakeLock } from '../../shared/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
 import type { Ball, GameState, Pocket, Side } from './types/pool';
 
@@ -185,7 +185,7 @@ export default function App() {
           <h2>Join a room</h2>
           <label className={label} htmlFor="code">Room code</label>
           <div className="join-controls">
-            <input id="code" className={`${field} pool-code`} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} placeholder="6 letters or digits" autoCapitalize="characters" autoComplete="off" spellCheck={false} />
+            <input id="code" className={`${field} lobby-code`} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} placeholder="6 letters or digits" autoCapitalize="characters" autoComplete="off" spellCheck={false} />
             <button name="mode" value="join" disabled={busy !== null} className={button.primary}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
             <button name="mode" value="watch" disabled={busy !== null} className={button.quiet}>Watch</button>
           </div>

@@ -2,7 +2,7 @@ import { numberLabel, SPIN_MS, staked } from '../engine/rouletteEngine';
 import { profitChance } from '../engine/odds';
 import type { GameState, Spot } from '../types/roulette';
 import { playerColor, resultName, useLanded } from './RouletteTable';
-import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
+import TournamentPanel, { useTicker, type TickerLine } from '../../../shared/TournamentPanel';
 
 const SPOT_NAME: Record<string, string> = {
   red: 'red', black: 'black', odd: 'odd', even: 'even', low: '1–18', high: '19–36',
@@ -48,13 +48,10 @@ export default function Tournament({ state, url }: { state: GameState; url: stri
   const landed = useLanded(state);
   const chances = profitChance(state, landed);
   // Chips on the table count as the player's; winnings only once the wheel has stopped on screen.
-  const leaders = state.players.map((p) => ({
-    id: p.id,
-    name: p.name,
-    connected: p.connected,
-    chance: chances[p.id],
-    color: playerColor(p.seat),
-    chips: p.chips + (state.phase === 'settled' ? (landed ? 0 : staked(p.bets) - p.payout) : staked(p.bets)),
-  }));
-  return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;
+  const leaders = state.players.map((p) => {
+    const score = p.chips + (state.phase === 'settled' ? (landed ? 0 : staked(p.bets) - p.payout) : staked(p.bets));
+    const chance = chances[p.id] === undefined ? undefined : `Win ${Math.round(chances[p.id] * 100)}%`;
+    return { id: p.id, name: p.name, connected: p.connected, color: playerColor(p.seat), score, change: score - state.config.startingStack, chance };
+  });
+  return <TournamentPanel code={state.roomCode} url={url} heading="Chip counts" chanceTitle="Chance this round's bets return a net profit" leaders={leaders} feed={feed} />;
 }

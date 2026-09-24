@@ -2,15 +2,15 @@ import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } f
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { BetControls, DealerControls, LimitControls, PlayControls } from './components/ActionControls';
 import PokDengTable from './components/PokDengTable';
-import InviteCard from './components/InviteCard';
-import HowToPlay from './components/HowToPlay';
+import InviteCard from '../../shared/InviteCard';
+import HowToPlay from '../../shared/HowToPlay';
 import { RULES } from './components/rules';
 import Tournament from './components/Tournament';
-import { button, field, label } from './components/ui';
+import { button, field, label } from '../../shared/ui';
 import type { GameState, TableConfig } from './types/pokdeng';
 import { createGame, isBroke, MAX_SEATS } from './engine/pokDengEngine';
-import { useAudio } from './hooks/useAudio';
-import { useWakeLock } from './hooks/useWakeLock';
+import { useAudio } from '../../shared/useAudio';
+import { useWakeLock } from '../../shared/useWakeLock';
 import { randomRoomCode, TableNet, type Identity, type NetStatus } from './network/tableNet';
 
 const randomHex = (bytes: number) =>
@@ -43,11 +43,11 @@ const isTournament = (name: string) => name.trim().toUpperCase() === 'TOURNAMENT
 /** Segmented radio buttons, as in the create-room form. */
 function Segmented<T extends number>({ name, options, value, onChange }: { name: string; options: readonly T[]; value: T; onChange: (v: T) => void }) {
   return (
-    <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-950/60 p-1 ring-1 ring-white/10">
+    <div className="grid grid-cols-4 gap-1 rounded-xl bg-[#e0e0d3] p-1">
       {options.map((o) => (
         <label key={o} className="relative">
           <input type="radio" name={name} value={o} checked={value === o} onChange={() => onChange(o)} className="peer sr-only" />
-          <span className="block cursor-pointer rounded-lg py-2 text-center font-mono text-sm font-medium text-slate-300 transition peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-yellow-300 hover:text-slate-50 peer-checked:hover:text-slate-900">
+          <span className="block cursor-pointer rounded-lg py-2 text-center font-mono text-sm font-medium text-(--muted) transition peer-focus-visible:outline-2 peer-focus-visible:outline-yellow-300">
             {o}
           </span>
         </label>
@@ -209,7 +209,7 @@ export default function App() {
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Pok Deng
               </h1>
-              <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
+              <p className="mt-2 max-w-[38ch] text-balance lg:mt-3 lg:text-lg">
                 The Thai card game of eights and nines, with the deal passing round the table. Virtual chips, no sign-up.
               </p>
             </header>
@@ -218,10 +218,10 @@ export default function App() {
             </div>
 
             {inAppHint && (
-              <div className="rise-in flex items-start gap-3 rounded-xl bg-slate-900/80 px-3.5 py-3 text-sm text-slate-200 ring-1 ring-white/15" role="note">
+              <div className="rise-in flex items-start gap-3 rounded-xl px-3.5 py-3 text-sm" role="note">
                 <p className="flex-1">
                   You're in an app's built-in browser, which can block the connection to other players. Open this page in Safari or
-                  Chrome instead: use the app's menu and choose <span className="font-semibold text-slate-50">Open in browser</span>.
+                  Chrome instead: use the app's menu and choose <span className="font-semibold">Open in browser</span>.
                 </p>
                 <button onClick={() => setInAppHint(false)} className={`${button.quiet} min-h-9 shrink-0 px-3 text-sm`}>
                   Dismiss
@@ -230,7 +230,7 @@ export default function App() {
             )}
 
             {notice && (
-              <p className="rise-in rounded-xl bg-amber-300/10 px-3.5 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30" role="alert">
+              <p className="rise-in rounded-xl px-3.5 py-2.5 text-sm" role="alert">
                 {notice}
               </p>
             )}
@@ -266,7 +266,7 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
+              <p className="mt-2 text-sm text-(--muted)">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
             </form>
           </div>
 
@@ -286,7 +286,7 @@ export default function App() {
               <input type="checkbox" checked={mustDraw} onChange={(e) => setMustDraw(e.target.checked)} className="size-5 accent-yellow-600" />
               House rule: under 4 on two cards must draw
             </label>
-            <p className="mt-2 text-sm text-slate-400">The dealer passes clockwise each round; alone, the app deals. One deck, shuffled every round. Deng multiplies a win or a loss up to 5 times the bet.</p>
+            <p className="mt-2 text-sm text-(--muted)">The dealer passes clockwise each round; alone, the app deals. One deck, shuffled every round. Deng multiplies a win or a loss up to 5 times the bet.</p>
 
             <button disabled={busy !== null} className={`${button.secondary} mt-4 min-h-12 w-full`}>
               {busy === 'create' ? 'Creating room…' : 'Create room'}

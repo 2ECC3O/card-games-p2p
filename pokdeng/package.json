@@ -8,11 +8,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx src/engine/pokDengEngine.test.ts && tsx src/network/network.test.ts"
+    "test": "tsx src/engine/pokDengEngine.test.ts"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource-variable/geist-mono": "^5.3.0",
     "@phosphor-icons/react": "^2.1.10",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",

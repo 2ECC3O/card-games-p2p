@@ -1,6 +1,6 @@
 import { handType, staked } from '../engine/pokDengEngine';
 import type { GameState } from '../types/pokdeng';
-import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
+import TournamentPanel, { useTicker, type TickerLine } from '../../../shared/TournamentPanel';
 
 const nameOf = (s: GameState, id: string | null) => s.players.find((p) => p.id === id)?.name ?? 'The house';
 
@@ -22,9 +22,9 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
 
 export default function Tournament({ state, url }: { state: GameState; url: string }) {
   const feed = useTicker(state, describe);
-  const leaders = state.players.map((p) => ({
-    id: p.id, name: p.name, connected: p.connected,
-    chips: p.chips + (state.phase === 'settled' ? 0 : staked(state, p.id)),
-  }));
-  return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;
+  const leaders = state.players.map((p) => {
+    const score = p.chips + (state.phase === 'settled' ? 0 : staked(state, p.id));
+    return { id: p.id, name: p.name, connected: p.connected, score, change: score - state.config.startingStack };
+  });
+  return <TournamentPanel code={state.roomCode} url={url} heading="Chip counts" leaders={leaders} feed={feed} />;
 }

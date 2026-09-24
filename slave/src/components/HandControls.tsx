@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { beats } from '../engine/slaveEngine';
 import type { Card, GameState, PlayerAction } from '../types/slave';
 import { CardFace, cardsText } from './SlaveTable';
-import { button } from './ui';
+import { button } from '../../../shared/ui';
 
 interface Props {
   state: GameState;

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "../../room.css";
+/* Shared components (shared/) use Tailwind classes too. */
+@source "../../shared";
 
 
 

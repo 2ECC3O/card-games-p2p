@@ -1,17 +1,17 @@
 import { EyeIcon, QrCodeIcon, SignOutIcon, SpeakerHighIcon, SpeakerSlashIcon } from '@phosphor-icons/react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ActionControls from './components/ActionControls';
-import InviteCard from './components/InviteCard';
-import HowToPlay from './components/HowToPlay';
+import InviteCard from '../../shared/InviteCard';
+import HowToPlay from '../../shared/HowToPlay';
 import { RULES } from './components/rules';
 import PokerTable from './components/PokerTable';
 import Tournament from './components/Tournament';
-import { button, field, label } from './components/ui';
+import { button, field, label } from '../../shared/ui';
 import { BETTING_PHASES, type BlindLevel, type GameState, type TableConfig } from './types/poker';
 import { createGame, MAX_SEATS } from './engine/pokerEngine';
 import { handEquity } from './engine/equity';
-import { useAudio } from './hooks/useAudio';
-import { useWakeLock } from './hooks/useWakeLock';
+import { useAudio } from '../../shared/useAudio';
+import { useWakeLock } from '../../shared/useWakeLock';
 import { PokerNet, randomRoomCode, type Identity, type NetStatus } from './network/pokerNet';
 
 const randomHex = (bytes: number) =>
@@ -224,7 +224,7 @@ export default function App() {
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Hold'em
               </h1>
-              <p className="mt-2 max-w-[38ch] text-balance text-slate-300 lg:mt-3 lg:text-lg">
+              <p className="mt-2 max-w-[38ch] text-balance lg:mt-3 lg:text-lg">
                 Texas Hold'em with friends, right in the browser. Virtual chips, no sign-up.
               </p>
             </header>
@@ -233,10 +233,10 @@ export default function App() {
             </div>
 
             {inAppHint && (
-              <div className="rise-in flex items-start gap-3 rounded-xl bg-slate-900/80 px-3.5 py-3 text-sm text-slate-200 ring-1 ring-white/15" role="note">
+              <div className="rise-in flex items-start gap-3 rounded-xl px-3.5 py-3 text-sm" role="note">
                 <p className="flex-1">
                   You're in an app's built-in browser, which can block the connection to other players. Open this page in Safari or
-                  Chrome instead: use the app's menu and choose <span className="font-semibold text-slate-50">Open in browser</span>.
+                  Chrome instead: use the app's menu and choose <span className="font-semibold">Open in browser</span>.
                 </p>
                 <button onClick={() => setInAppHint(false)} className={`${button.quiet} min-h-9 shrink-0 px-3 text-sm`}>
                   Dismiss
@@ -245,7 +245,7 @@ export default function App() {
             )}
 
             {notice && (
-              <p className="rise-in rounded-xl bg-amber-300/10 px-3.5 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30" role="alert">
+              <p className="rise-in rounded-xl px-3.5 py-2.5 text-sm" role="alert">
                 {notice}
               </p>
             )}
@@ -281,7 +281,7 @@ export default function App() {
                   Watch
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-400">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
+              <p className="mt-2 text-sm text-(--muted)">Watch follows the game without playing. Use TOURNAMENT as your name for the scoreboard display.</p>
             </form>
           </div>
 
@@ -294,17 +294,17 @@ export default function App() {
 
             <fieldset className="mt-4">
               <legend className={label}>Blind speed</legend>
-              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-950/60 p-1 ring-1 ring-white/10 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#e0e0d3] p-1 sm:grid-cols-4">
                 {PACES.map((p) => (
                   <label key={p.id} className="relative">
                     <input type="radio" name="pace" value={p.id} checked={pace === p.id} onChange={() => setPace(p.id)} className="peer sr-only" />
-                    <span className="block cursor-pointer rounded-lg py-2 text-center text-sm font-medium text-slate-300 transition peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-300 hover:text-slate-50 peer-checked:hover:text-slate-900">
+                    <span className="block cursor-pointer rounded-lg py-2 text-center text-sm font-medium text-(--muted) transition peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-300">
                       {p.label}
                     </span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-sm text-slate-400">
+              <p className="mt-2 text-sm text-(--muted)">
                 {pace === 'custom'
                   ? 'Set your own blind levels and how often they go up.'
                   : `Blinds start at 10/20 and go up every ${PACES.find((p) => p.id === pace)!.hands} hands.`}

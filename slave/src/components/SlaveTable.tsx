@@ -70,7 +70,7 @@ function SecondsLeft({ deadline }: { deadline: number }) {
 
 const TITLES: Title[] = ['King', 'Queen', 'Citizen', 'Serf', 'Slave'];
 
-export const TITLE_TONE: Record<Title, string> = {
+const TITLE_TONE: Record<Title, string> = {
   King: 'bg-yellow-300 text-yellow-950',
   Queen: 'bg-rose-200 text-rose-950',
   Citizen: 'bg-slate-200 text-slate-900',

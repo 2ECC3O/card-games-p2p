@@ -1,0 +1,18 @@
+{
+  "name": "card-games-p2p",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "poker",
+    "blackjack",
+    "roulette",
+    "pool",
+    "pokdeng",
+    "slave"
+  ],
+  "scripts": {
+    "test": "tsx shared/network.test.ts && npm test --workspaces",
+    "build": "npm run build --workspaces"
+  }
+}

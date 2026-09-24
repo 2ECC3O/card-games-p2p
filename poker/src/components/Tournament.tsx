@@ -1,5 +1,5 @@
 import type { GameState } from '../types/poker';
-import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
+import TournamentPanel, { useTicker, type TickerLine } from '../../../shared/TournamentPanel';
 
 function describe(prev: GameState, state: GameState): TickerLine[] {
   const lines: TickerLine[] = [];
@@ -21,11 +21,14 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
 /** A spectator display for one table; history counts completed hands, including ties as wins. */
 export default function Tournament({ state, url, equity }: { state: GameState; url: string; equity: Record<string, number> }) {
   const feed = useTicker(state, describe);
-  const leaders = state.players.map((p) => ({
-    id: p.id, name: p.name, connected: p.connected,
-    chips: p.chips + (state.phase === 'showdown' ? 0 : p.committed),
-    handsPlayed: p.handsPlayed, handsWon: p.handsWon,
-    equity: equity[p.id], exact: state.board.length === 5 || state.phase === 'showdown',
-  }));
-  return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;
+  const exact = state.board.length === 5 || state.phase === 'showdown';
+  const leaders = state.players.map((p) => {
+    const score = p.chips + (state.phase === 'showdown' ? 0 : p.committed);
+    return {
+      id: p.id, name: p.name, connected: p.connected, score, change: score - state.config.startingStack,
+      detail: p.handsPlayed ? `${Math.round((100 * p.handsWon) / p.handsPlayed)}% · ${p.handsWon}/${p.handsPlayed} past hands` : 'No past hands',
+      chance: equity[p.id] === undefined ? undefined : `${exact ? '' : '~'}${Math.round(equity[p.id] * 100)}%`,
+    };
+  });
+  return <TournamentPanel code={state.roomCode} url={url} heading="Chip counts · Live win chance" chanceTitle="Chance of winning this hand; ties split the chance. Past hands: completed hands won, ties included, over hands dealt." leaders={leaders} feed={feed} />;
 }

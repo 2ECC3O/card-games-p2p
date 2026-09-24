@@ -16,12 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      matrix:
-        game: [poker, blackjack, roulette, pool, pokdeng, slave]
-    defaults:
-      run:
-        working-directory: ${{ matrix.game }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -29,42 +23,28 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ${{ matrix.game }}/package-lock.json
 
+      # One install for every game (npm workspaces), then every game's tests and build.
       - run: npm ci
       - run: npm test
       - run: npm run build
         env:
-          # Optional relay (see src/network/iceServers.ts). Unset = direct connections only.
+          # Optional relay (see shared/iceServers.ts). Unset = direct connections only.
           VITE_OPENRELAY_APP: ${{ vars.OPENRELAY_APP }}
           VITE_OPENRELAY_API_KEY: ${{ secrets.OPENRELAY_API_KEY }}
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ matrix.game }}
-          path: ${{ matrix.game }}/dist/
-
-  site:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       # Every game's build lands in a folder named after it.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: site/
-
-      - run: cp index.html site/
+      - run: |
+          mkdir site
+          cp index.html site/
+          for game in poker blackjack roulette pool pokdeng slave; do cp -r "$game/dist" "site/$game"; done
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site/
 
   deploy:
-    needs: site
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       pages: write # to deploy to Pages

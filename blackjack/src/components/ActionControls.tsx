@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { legalActions } from '../engine/blackjackEngine';
 import type { GameState, PlayerAction } from '../types/blackjack';
-import { button } from './ui';
+import { button } from '../../../shared/ui';
 
 interface Props {
   state: GameState;

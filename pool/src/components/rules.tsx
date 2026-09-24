@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { type Page } from './HowToPlay';
+import { type Page } from '../../../shared/HowToPlay';
 
 const COLORS = ['#f7f3de', '#e9bb42', '#3f78bf', '#b4484a', '#74549e', '#d78c3f', '#4b9d69', '#8f4e55', '#151a1b'];
 type B = [n: number, x: number, y: number];

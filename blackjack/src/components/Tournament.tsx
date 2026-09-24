@@ -1,5 +1,5 @@
 import type { GameState } from '../types/blackjack';
-import TournamentPanel, { useTicker, type TickerLine } from './TournamentPanel';
+import TournamentPanel, { useTicker, type TickerLine } from '../../../shared/TournamentPanel';
 
 function describe(prev: GameState, state: GameState): TickerLine[] {
   const lines: TickerLine[] = [];
@@ -25,9 +25,10 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
 
 export default function Tournament({ state, url, chances }: { state: GameState; url: string; chances: Record<string, number> }) {
   const feed = useTicker(state, describe);
-  const leaders = state.players.map((p) => ({
-    id: p.id, name: p.name, connected: p.connected, chance: chances[p.id],
-    chips: p.chips + (state.phase === 'settled' ? 0 : p.hands.reduce((sum, hand) => sum + hand.bet, 0)),
-  }));
-  return <TournamentPanel code={state.roomCode} url={url} leaders={leaders} startingStack={state.config.startingStack} feed={feed} />;
+  const leaders = state.players.map((p) => {
+    const score = p.chips + (state.phase === 'settled' ? 0 : p.hands.reduce((sum, hand) => sum + hand.bet, 0));
+    const chance = chances[p.id] === undefined ? undefined : `Stand ~${Math.round(chances[p.id] * 100)}%`;
+    return { id: p.id, name: p.name, connected: p.connected, score, change: score - state.config.startingStack, chance };
+  });
+  return <TournamentPanel code={state.roomCode} url={url} heading="Chip counts" chanceTitle="Chance of net profit if all hands stand now" leaders={leaders} feed={feed} />;
 }

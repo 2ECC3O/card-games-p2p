@@ -208,14 +208,6 @@ body {
   color: #fffaf0;
   border-color: var(--accent);
 }
-.lobby [class*="text-slate-"] {
-  color: var(--muted);
-}
-.lobby [class*="bg-slate-"] {
-  background: #e0e0d3;
-  color: var(--ink);
-  box-shadow: none;
-}
 .lobby label:has(input[type="radio"]:checked) span {
   background: var(--ink);
   color: #fffaf0;

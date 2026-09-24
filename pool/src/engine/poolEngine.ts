@@ -1,8 +1,8 @@
 import type { Ball, GameState, Group, PlayerAction, Pocket, Side } from '../types/pool';
+import { cleanName, isBot, update, addSpectator as watch } from '../../../shared/lobby';
+export { cleanName, isBot, setConnected } from '../../../shared/lobby';
 import { clearPosition, DROPS, R, shotMs, simulate } from './physics';
 
-export const MAX_SEATS = 4;
-export const IDLE_MS = 5 * 60_000;
 /** Time for each shot or break decision, counted from when the balls stop. */
 export const SHOT_CLOCK_MS = 90_000;
 /** How far a bot's cue can stray, in radians either way (0.01 ≈ 0.6°). Raise it for a weaker bot, lower it for a stronger one. */
@@ -11,7 +11,6 @@ const BOT_AIM_ERROR = 0.01;
 const BOT_POWER_ERROR = 0.15;
 /** How long everyone sees a bot's aim and power before it shoots. */
 export const BOT_AIM_MS = 2_500;
-export const isBot = (id: string) => /^bot:\d+$/.test(id);
 /** Visible rack outlook, not a calibrated probability: clearance and next shot only. */
 export function rackOutlook(s: GameState, side: Side): number {
   if (s.phase === 'finished') return s.winner === side ? 100 : 0;
@@ -26,16 +25,11 @@ export function rackOutlook(s: GameState, side: Side): number {
 }
 const other = (side: Side): Side => side === 0 ? 1 : 0;
 const groupOf = (n: number): Group => n >= 1 && n <= 7 ? 'solids' : n >= 9 && n <= 15 ? 'stripes' : null;
-const update = (state: GameState, fn: (s: GameState) => void): GameState => { const s = structuredClone(state); fn(s); return s; };
 const members = (s: GameState, side: Side) => s.players.filter((p) => p.team === side);
 const shooter = (s: GameState, side: Side) => { const team = members(s, side); return team[s.nextMember[side] % team.length]?.id ?? null; };
 const available = (s: GameState) => s.mode === 'singles' ? 2 : 4;
 const ready = (s: GameState) => members(s, 0).length === available(s) / 2 && members(s, 1).length === available(s) / 2;
 const note = (s: GameState, message: string) => { s.lastEvent = message; s.history = [message, ...s.history].slice(0, 40); };
-
-export function cleanName(raw: unknown): string {
-  return [...(typeof raw === 'string' ? raw : '').replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
-}
 
 export function createGame(roomCode: string, mode: GameState['mode'], raceTo: number, now: number): GameState {
   return { roomCode, mode, raceTo, started: false, phase: 'waiting', rack: 0, balls: [], players: [], queue: [], spectators: [],
@@ -63,6 +57,9 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
   });
 }
 
+/** Join to watch; a seated or queued player coming back this way stays a player. */
+export const addSpectator = (state: GameState, id: string, name: string, now: number) => watch(state, id, name, now, addPlayer);
+
 export function addBot(state: GameState, now: number): GameState {
   if (state.started || state.players.length >= available(state)) return state;
   return update(state, (s) => { addBotSeat(s); s.lastActionAt = now; });
@@ -71,20 +68,6 @@ export function addBot(state: GameState, now: number): GameState {
 function addBotSeat(s: GameState) {
   const number = Math.max(0, ...s.players.map((p) => Number(/^bot:(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1;
   seat(s, `bot:${number}`, `Bot ${number}`);
-}
-
-export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
-  if (state.players.some((p) => p.id === id) || state.queue.some((p) => p.id === id)) return addPlayer(state, id, rawName, now);
-  return update(state, (s) => {
-    s.lastActionAt = now;
-    const p = s.spectators.find((p) => p.id === id);
-    if (p) { p.name = cleanName(rawName); p.connected = true; }
-    else s.spectators.push({ id, name: cleanName(rawName), connected: true });
-  });
-}
-
-export function setConnected(state: GameState, id: string, connected: boolean): GameState {
-  return update(state, (s) => { const p = [...s.players, ...s.queue, ...s.spectators].find((p) => p.id === id); if (p) p.connected = connected; });
 }
 
 export function removePlayer(state: GameState, id: string, now: number): GameState {

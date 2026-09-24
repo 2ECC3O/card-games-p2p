@@ -1,13 +1,13 @@
 import type { GameState, Player, PlayerAction, Spot, TableConfig } from '../types/roulette';
+import { cleanName, isBot, isSpectator, randomInt, update, addSpectator as watch } from '../../../shared/lobby';
+export { cleanName, isBot, isSpectator, setConnected } from '../../../shared/lobby';
 
 export const MAX_SEATS = 10;
-export const MAX_QUEUE = 20;
+const MAX_QUEUE = 20;
 export const BET_MS = 60_000;
 /** The wheel spins this long on every screen before the result shows. */
 export const SPIN_MS = 6_000;
 export const SETTLE_MS = 6_000;
-export const IDLE_MS = 5 * 60_000;
-export const isBot = (id: string) => /^bot:\d+$/.test(id);
 const BOT_DELAY_MS = 1_000;
 const HISTORY = 15;
 
@@ -24,7 +24,7 @@ export const wheelOf = (config: TableConfig) => (config.doubleZero ? AMERICAN_WH
 export const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
 export const OUTSIDE = ['red', 'black', 'odd', 'even', 'low', 'high', 'd1', 'd2', 'd3', 'c1', 'c2', 'c3'] as const;
-export const SPOTS: readonly Spot[] = [...Array.from({ length: 38 }, (_, n) => `n${n}` as Spot), ...OUTSIDE];
+const SPOTS: readonly Spot[] = [...Array.from({ length: 38 }, (_, n) => `n${n}` as Spot), ...OUTSIDE];
 const VALID = new Set<string>(SPOTS);
 
 /** Chips returned per chip staked when `n` comes up (stake included): 36 for a number, 3 for a dozen or column, 2 for even money, else 0. */
@@ -43,22 +43,7 @@ export function payoutMultiple(spot: Spot, n: number): number {
   }
 }
 
-/** Unbiased crypto-random integer in [0, n). */
-function randomInt(n: number): number {
-  const limit = 2 ** 32 - (2 ** 32 % n);
-  const buf = new Uint32Array(1);
-  do crypto.getRandomValues(buf);
-  while (buf[0] >= limit);
-  return buf[0] % n;
-}
-
 // ------------------------------------------------ helpers
-
-const update = (state: GameState, fn: (s: GameState) => void): GameState => {
-  const s = structuredClone(state);
-  fn(s);
-  return s;
-};
 
 const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
 
@@ -70,16 +55,6 @@ function seat(s: GameState, id: string, name: string, chips: number, connected: 
   while (taken.has(free)) free++;
   s.players.push({ id, name, seat: free, chips, bets: {}, lastBets: {}, done: false, payout: 0, connected });
   s.players.sort((a, b) => a.seat - b.seat);
-}
-
-/**
- * Display names as shown to everyone: invisible and control characters removed (they can reverse or hide
- * text next to the name), whitespace trimmed, at most 20 characters. Zero-width joiners stay, so emoji
- * sequences still render. Empty result: "Player".
- */
-export function cleanName(name: unknown): string {
-  const text = typeof name === 'string' ? name : '';
-  return [...text.replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
 }
 
 // ------------------------------------------------ lobby
@@ -112,6 +87,9 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
   });
 }
 
+/** Join to watch; a seated or queued player coming back this way stays a player. */
+export const addSpectator = (state: GameState, id: string, name: string, now: number) => watch(state, id, name, now, addPlayer);
+
 /** Host-owned seat; queued during play and never replenished after elimination. */
 export function addBot(state: GameState, now: number): GameState {
   if (state.players.length + state.queue.length >= MAX_SEATS) return state;
@@ -123,13 +101,6 @@ export function addBot(state: GameState, now: number): GameState {
     if (!s.started) seat(s, id, name, s.config.startingStack, true);
     else s.queue.push({ id, name, connected: true });
     s.lastActionAt = now;
-  });
-}
-
-export function setConnected(state: GameState, id: string, connected: boolean): GameState {
-  return update(state, (s) => {
-    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
-    if (p) p.connected = connected;
   });
 }
 
@@ -153,21 +124,6 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
     s.spectators = s.spectators.filter((w) => w.id !== id);
     s.players = s.players.filter((p) => p.id !== id); // their chips on the table go with them
     if (s.phase === 'betting') spinIfAllDone(s, now);
-  });
-}
-
-/** Watching the table, not playing. */
-export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
-
-/** Join to watch. A seated or queued player who comes back this way stays a player. */
-export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
-  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
-  const name = cleanName(rawName);
-  return update(state, (s) => {
-    s.lastActionAt = now;
-    const known = s.spectators.find((w) => w.id === id);
-    if (known) Object.assign(known, { name, connected: true });
-    else s.spectators.push({ id, name, connected: true });
   });
 }
 

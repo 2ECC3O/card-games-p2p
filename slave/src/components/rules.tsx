@@ -1,4 +1,4 @@
-import { Hand, Tag, type Page } from './HowToPlay';
+import { Hand, Tag, type Page } from '../../../shared/HowToPlay';
 
 export const RULES: Page[] = [
   {

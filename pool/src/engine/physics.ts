@@ -25,11 +25,11 @@ const BALL_E = 0.95; // ball-to-ball restitution
 const SIDE_KICK = 0.5; // how much side spin bends a rebound
 
 export interface Shot { dirX: number; dirY: number; power: number; tipX: number; tipY: number }
-export interface ShotResult { balls: Ball[]; pocketed: { n: number; pocket: Pocket }[]; firstHit: number | null; railAfter: boolean; breakRails: number; steps: number }
+interface ShotResult { balls: Ball[]; pocketed: { n: number; pocket: Pocket }[]; firstHit: number | null; railAfter: boolean; breakRails: number; steps: number }
 /** A ball in motion: velocity v, rolling velocity w (v = w when rolling without slip), and side spin. */
-export interface Body { n: number; x: number; y: number; vx: number; vy: number; wx: number; wy: number; side: number; down: boolean }
+interface Body { n: number; x: number; y: number; vx: number; vy: number; wx: number; wy: number; side: number; down: boolean }
 
-export const speedOf = (power: number) => 30 + power * 38;
+const speedOf = (power: number) => 30 + power * 38;
 export const shotMs = (steps: number) => Math.ceil((steps * 1000) / HZ);
 
 /**
@@ -158,7 +158,7 @@ export function simulate(input: Ball[], shot: Shot, onFrame?: (balls: readonly B
 }
 
 /** Where the cue ball will go before it touches a ball, then the first stretch of both balls after contact. */
-export interface Preview { path: [number, number][]; ghost: [number, number] | null; cueAfter: [number, number][]; hit: { n: number; path: [number, number][] } | null }
+interface Preview { path: [number, number][]; ghost: [number, number] | null; cueAfter: [number, number][]; hit: { n: number; path: [number, number][] } | null }
 
 export function preview(balls: Ball[], shot: Shot): Preview {
   const out: Preview = { path: [], ghost: null, cueAfter: [], hit: null };

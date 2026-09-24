@@ -1,4 +1,6 @@
 import pokersolver from 'pokersolver';
+import { cleanName, isBot, isSpectator, randomInt, update, addSpectator as watch } from '../../../shared/lobby';
+export { cleanName, isBot, isSpectator, setConnected } from '../../../shared/lobby';
 import { handEquity } from './equity';
 import {
   BETTING_PHASES,
@@ -13,29 +15,18 @@ import {
 const { Hand } = pokersolver; // CommonJS package: default import works in Vite and tsx
 
 export const MAX_SEATS = 10;
-export const isBot = (id: string) => /^bot:\d+$/.test(id);
 export const MAX_QUEUE = 20;
 export const TURN_MS = 60_000;
 const BOT_DELAY_MS = 1_000;
-export const SHOWDOWN_MS = 6_000;
+const SHOWDOWN_MS = 6_000;
 /** Extra showdown time while the table turns cards over (per player) and deals an all-in runout (per card). */
 const REVEAL_MS = 500;
 const RUNOUT_MS = 550;
-export const IDLE_MS = 5 * 60_000;
 
 // ------------------------------------------------ cards
 
 function newDeck(): Card[] {
   return [...'23456789TJQKA'].flatMap((r) => [...'shdc'].map((s) => `${r}${s}` as Card));
-}
-
-/** Unbiased crypto-random integer in [0, n). */
-function randomInt(n: number): number {
-  const limit = 2 ** 32 - (2 ** 32 % n);
-  const buf = new Uint32Array(1);
-  do crypto.getRandomValues(buf);
-  while (buf[0] >= limit);
-  return buf[0] % n;
 }
 
 /** Fisher-Yates, in place. */
@@ -48,12 +39,6 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 // ------------------------------------------------ helpers
-
-const update = (state: GameState, fn: (s: GameState) => void): GameState => {
-  const s = structuredClone(state);
-  fn(s);
-  return s;
-};
 
 const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
 
@@ -81,16 +66,6 @@ function seat(s: GameState, id: string, name: string, chips: number, connected: 
     handsPlayed: record?.handsPlayed ?? 0, handsWon: record?.handsWon ?? 0,
   });
   s.players.sort((a, b) => a.seat - b.seat);
-}
-
-/**
- * Display names as shown to everyone: invisible and control characters removed (they can reverse or hide
- * text next to the name), whitespace trimmed, at most 20 characters. Zero-width joiners stay, so emoji
- * sequences still render. Empty result: "Player".
- */
-export function cleanName(name: unknown): string {
-  const text = typeof name === 'string' ? name : '';
-  return [...text.replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
 }
 
 // ------------------------------------------------ lobby
@@ -124,6 +99,9 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
   });
 }
 
+/** Join to watch; a seated or queued player coming back this way stays a player. */
+export const addSpectator = (state: GameState, id: string, name: string, now: number) => watch(state, id, name, now, addPlayer);
+
 /** Host-owned seat; added now or queued for the next hand. */
 export function addBot(state: GameState, now: number): GameState {
   if (state.players.length + state.queue.length >= MAX_SEATS) return state;
@@ -135,13 +113,6 @@ export function addBot(state: GameState, now: number): GameState {
     if (!s.started && s.players.length < MAX_SEATS) seat(s, id, name, s.config.startingStack, true);
     else s.queue.push({ id, name, connected: true });
     s.lastActionAt = now;
-  });
-}
-
-export function setConnected(state: GameState, id: string, connected: boolean): GameState {
-  return update(state, (s) => {
-    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
-    if (p) p.connected = connected;
   });
 }
 
@@ -171,21 +142,6 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
     p.folded = true;
     p.lastAction = 'Left';
     advance(s, now, p.seat, s.activeId !== id);
-  });
-}
-
-/** Watching the table, not playing. */
-export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
-
-/** Join to watch. A seated or queued player who comes back this way stays a player. */
-export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
-  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
-  const name = cleanName(rawName);
-  return update(state, (s) => {
-    s.lastActionAt = now;
-    const known = s.spectators.find((w) => w.id === id);
-    if (known) Object.assign(known, { name, connected: true });
-    else s.spectators.push({ id, name, connected: true });
   });
 }
 
@@ -399,7 +355,7 @@ export function applyAction(state: GameState, id: string, action: PlayerAction, 
 }
 
 /** The bot uses only its own cards and the public board; opponents' hidden cards never inform its move. */
-export function botAction(s: GameState, id: string): PlayerAction {
+function botAction(s: GameState, id: string): PlayerAction {
   const p = find(s, id)!;
   const legal = legalActions(s, id);
   const opponents = s.players.filter((other) => other.id !== id && !other.folded);

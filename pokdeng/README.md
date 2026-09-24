@@ -56,18 +56,27 @@ deal hands every bet back and passes the deal on.
 
 ## Run it on your own computer
 
-Needs [Node.js](https://nodejs.org) 20.19 or newer. From this folder: `npm install`, then `npm run dev`.
-`npm test` runs the engine and network checks; `npm run build` makes the static site in `dist/`.
+Needs [Node.js](https://nodejs.org) 20.19 or newer. From the repository root, install once for every game, then
+start this one:
+
+```bash
+npm install
+npm run dev -w pokdeng
+```
+
+Then open the address it prints. `npm test -w pokdeng` runs the engine checks (`npm test` at the root runs every
+game's plus the shared network checks); `npm run build -w pokdeng` makes the static site in `pokdeng/dist/`.
 
 ## How it works
 
 - `src/engine/pokDengEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
-- `src/network/tableNet.ts`: PeerJS rooms, as in the other games. `maskFor` hides the deck, and every hand but
+- `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
+  its room prefix and the shape of a valid move. `maskFor` hides the deck, and every hand but
   your own (a Pok and caught hands are face up) until the round settles; the dealer's cards show after a catch.
   Spectators see everything.
 - `src/components/PokDengTable.tsx`, `ActionControls.tsx`: the table and the bet, limit, draw and dealer controls.
 
-Bump `PREFIX` in `tableNet.ts` when the wire format changes.
+Bump `prefix` in `src/network/tableNet.ts` when the wire format changes.
 
 ## License
 

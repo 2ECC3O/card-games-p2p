@@ -1,13 +1,13 @@
 import type { Card, GameState, Player, PlayerAction, Title } from '../types/slave';
+import { cleanName, isBot, isSpectator, randomInt, update, addSpectator as watch } from '../../../shared/lobby';
+export { cleanName, isBot, isSpectator, setConnected } from '../../../shared/lobby';
 
 export const MAX_SEATS = 8;
 /** Starting with fewer players fills the table to this with bots. */
 export const MIN_TABLE = 4;
-export const MAX_QUEUE = 20;
+const MAX_QUEUE = 20;
 export const TURN_MS = 30_000;
-export const SETTLE_MS = 8_000;
-export const IDLE_MS = 5 * 60_000;
-export const isBot = (id: string) => /^bot:\d+$/.test(id);
+const SETTLE_MS = 8_000;
 const BOT_DELAY_MS = 900;
 /** The exchange is slower, so everyone sees the cards change hands: bots give back after this, */
 const BOT_GIVE_MS = 2_500;
@@ -17,20 +17,11 @@ export const EXCHANGE_SHOW_MS = 4_000;
 // ------------------------------------------------ cards
 
 /** 3 is the lowest rank and 2 the highest. Within a rank, suits go ♣ < ♦ < ♥ < ♠, so 2♠ is the top card. */
-export const RANKS = '3456789TJQKA2';
+const RANKS = '3456789TJQKA2';
 export const rank = (c: Card) => RANKS.indexOf(c[0]);
 const SUITS = 'cdhs';
 /** Low to high, clubs first within a rank. */
-export const sortCards = (cards: Card[]) => [...cards].sort((a, b) => rank(a) - rank(b) || SUITS.indexOf(a[1]) - SUITS.indexOf(b[1]));
-
-/** Unbiased crypto-random integer in [0, n). */
-function randomInt(n: number): number {
-  const limit = 2 ** 32 - (2 ** 32 % n);
-  const buf = new Uint32Array(1);
-  do crypto.getRandomValues(buf);
-  while (buf[0] >= limit);
-  return buf[0] % n;
-}
+const sortCards = (cards: Card[]) => [...cards].sort((a, b) => rank(a) - rank(b) || SUITS.indexOf(a[1]) - SUITS.indexOf(b[1]));
 
 /** One fresh deck per round, Fisher-Yates shuffled. No jokers. */
 function newDeck(): Card[] {
@@ -123,12 +114,6 @@ export function botGive(hand: Card[], count: number): Card[] {
 
 // ------------------------------------------------ helpers
 
-const update = (state: GameState, fn: (s: GameState) => void): GameState => {
-  const s = structuredClone(state);
-  fn(s);
-  return s;
-};
-
 const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
 /** First of `among` (sorted by seat) after `id`'s seat, going round this round's way. */
 const nextAfter = (s: GameState, id: string, among: Player[]) => {
@@ -143,16 +128,6 @@ function seat(s: GameState, id: string, name: string, connected: boolean) {
   while (taken.has(free)) free++;
   s.players.push({ id, name, seat: free, hand: [], title: null, points: 0, connected, left: false });
   s.players.sort((a, b) => a.seat - b.seat);
-}
-
-/**
- * Display names as shown to everyone: invisible and control characters removed (they can reverse or hide
- * text next to the name), whitespace trimmed, at most 20 characters. Zero-width joiners stay, so emoji
- * sequences still render. Empty result: "Player".
- */
-export function cleanName(name: unknown): string {
-  const text = typeof name === 'string' ? name : '';
-  return [...text.replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
 }
 
 // ------------------------------------------------ lobby
@@ -185,6 +160,9 @@ export function addPlayer(state: GameState, id: string, rawName: string, now: nu
   });
 }
 
+/** Join to watch; a seated or queued player coming back this way stays a player. */
+export const addSpectator = (state: GameState, id: string, name: string, now: number) => watch(state, id, name, now, addPlayer);
+
 /** Host-owned seat; queued during play. */
 export function addBot(state: GameState, now: number): GameState {
   if (state.players.length + state.queue.length >= MAX_SEATS) return state;
@@ -198,13 +176,6 @@ export function addBot(state: GameState, now: number): GameState {
   });
 }
 
-export function setConnected(state: GameState, id: string, connected: boolean): GameState {
-  return update(state, (s) => {
-    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
-    if (p) p.connected = connected;
-  });
-}
-
 /** Between rounds the seat goes at once; mid-round it plays itself out and goes at the next deal. */
 export function removePlayer(state: GameState, id: string, now: number): GameState {
   return update(state, (s) => {
@@ -215,21 +186,6 @@ export function removePlayer(state: GameState, id: string, now: number): GameSta
     if (!p) return;
     if (s.phase === 'playing' || s.phase === 'exchange') p.left = true;
     else s.players = s.players.filter((x) => x !== p);
-  });
-}
-
-/** Watching the table, not playing. */
-export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
-
-/** Join to watch. A seated or queued player who comes back this way stays a player. */
-export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
-  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
-  const name = cleanName(rawName);
-  return update(state, (s) => {
-    s.lastActionAt = now;
-    const known = s.spectators.find((w) => w.id === id);
-    if (known) Object.assign(known, { name, connected: true });
-    else s.spectators.push({ id, name, connected: true });
   });
 }
 
