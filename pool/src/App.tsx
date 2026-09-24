@@ -228,7 +228,7 @@ export default function App() {
       : game.choice?.type === 'eight-foul' ? [['spot', 'Spot 8 · cue in hand'], ['rebreak-self', 'We re-break']]
         : [['accept', 'Accept table'], ['head', 'Cue in hand']];
   return <main className="pool-room">
-    <header className="pool-header"><span style={{ display: 'flex', gap: 8 }}><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} />{game.roomCode}<QrCodeIcon size={18} aria-hidden /></button><HowToPlay pages={RULES} compact /></span>
+    <header className="pool-header"><span style={{ display: 'flex', gap: 8 }}><button className={button.quiet} onClick={() => inviteRef.current?.showModal()} aria-label={`Invite to room ${game.roomCode}`}><span className="pool-status" data-state={status} /><span className="pool-room-code">{game.roomCode}</span><QrCodeIcon size={18} aria-hidden /><span className="pool-wide">Invite</span></button><HowToPlay pages={RULES} compact /></span>
       <div className="pool-header-center">Rack {game.rack || '—'} <span>·</span> {game.mode === 'doubles' ? 'Doubles' : 'Singles'} <span>·</span> Race to {game.raceTo}</div>
       <span className="pool-header-end">
         {game.spectators.length > 0 && <span className="pool-watchers" title={game.spectators.map((w) => w.name).join(', ')}><EyeIcon size={16} aria-hidden />{game.spectators.length}<span className="sr-only"> watching</span></span>}

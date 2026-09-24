@@ -28,9 +28,11 @@ button:disabled { cursor: not-allowed; }
 .pool-watchers { display: flex; align-items: center; gap: 6px; color: #c6d4c7; font-size: 14px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 640px) { .pool-watchers, .pool-wide { display: none; } }
-.pool-status { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #f2bd70; }
-.pool-status[data-state=hosting], .pool-status[data-state=connected] { background: #7acb8e; }
-.pool-status[data-state=reconnecting] { background: #e77070; }
+/* Same as the other rooms: the room code in wide mono, and a yellow dot while connected. */
+.pool-room-code { font-family: "Courier New", monospace; letter-spacing: .1em; }
+.pool-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #fcd34d; }
+.pool-status[data-state=hosting], .pool-status[data-state=connected] { background: #facc15; }
+.pool-status[data-state=reconnecting] { background: #fb7185; }
 .pool-room-body { max-width: 1500px; margin: auto; }
 .pool-room-body.pool-display { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: calc(100dvh - 62px); }
 .pool-main { width: 100%; min-width: 0; padding: 12px clamp(10px, 2.5vw, 32px) 30px; }
