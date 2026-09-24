@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { addBot, addPlayer, applyAction, beats, botGive, botMove, createGame, hostTick, maskFor, odds, ranking, startGame, startRound, titles, TURN_MS } from './slaveEngine';
+import { addBot, addPlayer, applyAction, beats, botGive, botMove, createGame, EXCHANGE_SHOW_MS, hostTick, maskFor, odds, ranking, startGame, startRound, titles, TURN_MS } from './slaveEngine';
 import type { Card, GameState } from '../types/slave';
 
 // ------------------------------------------------ plays
@@ -102,9 +102,27 @@ assert.ok(s.players[3].hand.includes('Ah'), "and the Serf's best to the Queen");
 assert.throws(() => applyAction(s, 'p1', { type: 'give', cards: ['3d'] }, 1), /Give 2/);
 s = applyAction(s, 'p1', { type: 'give', cards: ['3d', '4d'] }, 1);
 s = applyAction(s, 'p3', { type: 'give', cards: ['3s'] }, 1);
+assert.equal(s.phase, 'exchange', 'the finished exchange stays on show');
+assert.equal(hostTick(s, 1 + EXCHANGE_SHOW_MS - 1), s);
+s = hostTick(s, 1 + EXCHANGE_SHOW_MS);
 assert.equal(s.phase, 'playing');
-assert.equal(s.activeId, 'p0', "last round's Slave leads");
+assert.equal(s.activeId, 'p0', 'whoever holds 3♣ after the exchange leads (here the Slave kept it)');
+assert.equal(s.dir, 1);
 assert.equal(s.players.reduce((n, p) => n + p.hand.length, 0), 16, 'no cards lost');
+
+// Turns go the short way round to the Slave: 3♣ at seat 0, the Slave at seat 3 of 5, so seat 4 plays next.
+s = table([[], [], [], [], []]);
+s.players.forEach((p, i) => (p.title = i === 3 ? 'Slave' : 'Citizen'));
+startRound(s, 0, ['3c', '4c', '5c', '6c', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc'] as Card[]);
+assert.equal(s.activeId, 'p0');
+assert.equal(s.dir, -1, 'counter-clockwise: two seats to the Slave instead of three');
+s = applyAction(s, 'p0', { type: 'play', cards: ['3c'] }, 1);
+assert.equal(s.activeId, 'p4');
+s = applyAction(s, 'p4', { type: 'play', cards: ['7c'] }, 1);
+assert.equal(s.activeId, 'p3');
+s.players.forEach((p) => (p.title = p.id === 'p1' ? 'Slave' : 'Citizen'));
+startRound(s, 0, ['3c', '4c', '5c', '6c', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc'] as Card[]);
+assert.equal(s.dir, 1, 'clockwise when the Slave is the nearer that way');
 
 // ------------------------------------------------ a bot match plays itself
 let b = createGame('BOTS01', 0);

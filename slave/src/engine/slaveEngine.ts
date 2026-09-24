@@ -9,6 +9,10 @@ export const SETTLE_MS = 8_000;
 export const IDLE_MS = 5 * 60_000;
 export const isBot = (id: string) => /^bot:\d+$/.test(id);
 const BOT_DELAY_MS = 900;
+/** The exchange is slower, so everyone sees the cards change hands: bots give back after this, */
+const BOT_GIVE_MS = 2_500;
+/** and the finished exchange stays on show this long before the first lead. */
+export const EXCHANGE_SHOW_MS = 4_000;
 
 // ------------------------------------------------ cards
 
@@ -126,10 +130,11 @@ const update = (state: GameState, fn: (s: GameState) => void): GameState => {
 };
 
 const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
-/** First of `among` clockwise after `id`'s seat. */
+/** First of `among` (sorted by seat) after `id`'s seat, going round this round's way. */
 const nextAfter = (s: GameState, id: string, among: Player[]) => {
   const seat = find(s, id)?.seat ?? -1;
-  return among.find((p) => p.seat > seat) ?? among[0];
+  const order = s.dir === 1 ? among : [...among].reverse();
+  return order.find((p) => (p.seat - seat) * s.dir > 0) ?? order[0];
 };
 
 function seat(s: GameState, id: string, name: string, connected: boolean) {
@@ -155,7 +160,7 @@ export function cleanName(name: unknown): string {
 export function createGame(roomCode: string, now: number): GameState {
   return {
     roomCode, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [],
-    pile: null, passed: [], out: [], gives: [], activeId: null, deadline: null, nextRoundAt: null, lastActionAt: now,
+    pile: null, passed: [], out: [], gives: [], activeId: null, dir: 1, deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
 
@@ -248,7 +253,7 @@ export function startRound(s: GameState, now: number, deck?: Card[]) {
     const q = s.queue.shift()!;
     seat(s, q.id, q.name, q.connected);
   }
-  Object.assign(s, { pile: null, passed: [], out: [], gives: [], activeId: null, deadline: null, nextRoundAt: null });
+  Object.assign(s, { pile: null, passed: [], out: [], gives: [], activeId: null, dir: 1, deadline: null, nextRoundAt: null });
   for (const p of s.players) p.hand = [];
   if (s.players.length < 2) return void (s.phase = 'waiting');
   (deck ?? newDeck()).forEach((c, i) => s.players[i % s.players.length].hand.push(c));
@@ -268,10 +273,16 @@ export function startRound(s: GameState, now: number, deck?: Card[]) {
   s.deadline = now + TURN_MS;
 }
 
-/** Last round's Slave leads; the first round, whoever holds 3♣. */
+/**
+ * Whoever holds 3♣ (after the exchange) leads. Turns then go whichever way reaches last round's Slave sooner;
+ * clockwise on a tie, in the first round, or when the Slave holds 3♣.
+ */
 function lead(s: GameState, now: number) {
-  const first = s.players.find((p) => p.title === 'Slave') ?? s.players.find((p) => p.hand.includes('3c'))!;
-  Object.assign(s, { phase: 'playing', activeId: first.id, deadline: now + TURN_MS });
+  const n = s.players.length;
+  const first = s.players.findIndex((p) => p.hand.includes('3c'));
+  const slave = s.players.findIndex((p) => p.title === 'Slave');
+  const dir = slave >= 0 && (first - slave + n) % n < (slave - first + n) % n ? -1 : 1;
+  Object.assign(s, { phase: 'playing', activeId: s.players[first].id, dir, deadline: now + TURN_MS });
 }
 
 /** After a play or a pass: the next player still in on this pile, or a fresh lead once everyone else has passed. */
@@ -322,7 +333,7 @@ function act(s: GameState, id: string, action: PlayerAction, now: number) {
     const to = find(s, g.to)!;
     to.hand = sortCards([...to.hand, ...cards]);
     g.cards = sortCards(cards);
-    if (s.gives.every((x) => x.cards.length)) lead(s, now);
+    if (s.gives.every((x) => x.cards.length)) s.deadline = now + EXCHANGE_SHOW_MS; // hostTick leads once it's shown
     return;
   }
 
@@ -363,9 +374,11 @@ export function hostTick(state: GameState, now: number): GameState {
   const { phase, deadline } = state;
   // Bots and players who left move after a short pause; everyone else when their time runs out.
   const auto = (id: string) => isBot(id) || !!find(state, id)?.left;
-  const due = (id: string) => deadline !== null && (now >= deadline || (auto(id) && now >= deadline - TURN_MS + BOT_DELAY_MS));
+  const pause = phase === 'exchange' ? BOT_GIVE_MS : BOT_DELAY_MS;
+  const due = (id: string) => deadline !== null && (now >= deadline || (auto(id) && now >= deadline - TURN_MS + pause));
   const mover = phase === 'exchange' ? state.gives.find((g) => !g.cards.length && due(g.from))?.from : phase === 'playing' && state.activeId && due(state.activeId) ? state.activeId : null;
   if (mover) return update(state, (s) => act(s, mover, autoAction(s, mover, auto(mover)), now));
+  if (phase === 'exchange' && state.gives.every((g) => g.cards.length) && now >= deadline!) return update(state, (s) => lead(s, now));
   if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && state.players.length + state.queue.length >= 2))) {
     return update(state, (s) => startRound(s, now));
   }

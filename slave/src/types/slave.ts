@@ -58,6 +58,8 @@ export interface GameState {
   out: string[];
   gives: Give[];
   activeId: string | null;
+  /** Turn order this round: 1 clockwise (up the seats), −1 the other way. */
+  dir: 1 | -1;
   deadline: number | null;
   nextRoundAt: number | null;
   lastActionAt: number;

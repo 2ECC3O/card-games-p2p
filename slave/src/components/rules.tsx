@@ -20,7 +20,7 @@ export const RULES: Page[] = [
         <Hand cards="9♣ 9♦ 9♥" />
       </>
     ),
-    text: <>Play a <b>single</b>, a <b>pair</b>, <b>three of a kind</b> (ตอง) or <b>four of a kind</b>. No runs. Whoever holds <b>3♣</b> starts the first round.</>,
+    text: <>Play a <b>single</b>, a <b>pair</b>, <b>three of a kind</b> (ตอง) or <b>four of a kind</b>. No runs. Every round, whoever holds <b>3♣</b> leads.</>,
   },
   {
     title: 'Beat the pile, or pass',
@@ -40,7 +40,7 @@ export const RULES: Page[] = [
   {
     title: 'The exchange',
     picture: <div className="htp-row"><Tag>Slave → King: best 2</Tag><Tag>King → Slave: any 2</Tag></div>,
-    text: <>At each deal the Slave hands the King their <b>two best cards</b>, and the Serf hands the Queen their <b>best one</b>. The King and Queen then choose the same number of cards to give back. The Slave leads the first trick.</>,
+    text: <>At each deal the Slave hands the King their <b>two best cards</b>, and the Serf hands the Queen their <b>best one</b>. The King and Queen then choose the same number of cards to give back. Then whoever holds 3♣ leads, and turns go whichever way round reaches the Slave sooner (clockwise on a tie).</>,
   },
   {
     title: 'Keep your crown',

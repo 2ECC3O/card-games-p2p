@@ -26,12 +26,14 @@ own engine and table, in plum.
 - **Your turn (30 s):** tap cards, then **Play**, or **Pass**. A pass puts you out until the pile clears. When
   everyone else has passed, the pile clears and whoever played it leads; if they're already out, the next player
   leads. Time out and you pass, or play your lowest card if it's your lead.
-- **Who starts:** the holder of 3♣ in the first round; after that, last round's Slave.
+- **Who starts:** every round, whoever holds 3♣ (after the exchange) leads. Turns then go whichever way round
+  reaches last round's Slave sooner: clockwise on a tie, in the first round, or when the Slave holds 3♣.
 - **Titles:** first out is **King**, second **Queen**, second-last **Serf** (รองสลาฟ), last **Slave**, everyone else
   **Citizen**. With 3 players there's no Queen or Serf; with 2, just King and Slave.
 - **Falls:** a King who isn't first out drops to Slave. A Queen who then isn't in the top two drops to Serf.
 - **Exchange (30 s):** at each deal the Slave's two best cards go to the King and the Serf's best card to the
   Queen. The King and Queen then pick the same number of cards to give back. Time out and you give back your lowest.
+  Cards you receive are highlighted, and the exchange stays on the table for 4 seconds before the first lead.
 - **Points:** finishing k-th of n earns n − k points, for the TOURNAMENT display's leaderboard.
 - **Bots** go out whenever one play empties their hand. They lead their lowest rank whole; against a player on one
   card they lead a pair or more, or their highest single. They follow with the lowest set that fits, breaking up a

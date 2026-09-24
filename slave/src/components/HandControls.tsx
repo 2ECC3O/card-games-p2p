@@ -30,9 +30,15 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
     onAction(action);
   };
   const toggle = (c: Card) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...chosen, c]));
-  const receiver = give && state.players.find((p) => p.id === give.to)?.name;
+  const nameOf = (id: string) => state.players.find((p) => p.id === id)?.name ?? 'someone';
+  // The exchange, as it happens: what came in (highlighted in your hand) and what went out.
+  const swaps = state.phase === 'exchange' ? state.gives.filter((g) => g.cards.length && (g.to === heroId || g.from === heroId)) : [];
+  const got = swaps.filter((g) => g.to === heroId).flatMap((g) => g.cards);
+  const swapText = swaps.map((g) => (g.to === heroId ? `got ${cardsText(g.cards)} from ${nameOf(g.from)}` : `gave ${cardsText(g.cards)} to ${nameOf(g.to)}`)).join(' and ');
   const hint = give
-    ? `Pick ${give.count} card${give.count > 1 ? 's' : ''} to give ${receiver}`
+    ? `Pick ${give.count} card${give.count > 1 ? 's' : ''} to give ${nameOf(give.to)}.${swapText ? ` You ${swapText}.` : ''}`
+    : swapText
+      ? `You ${swapText}.`
     : myTurn
       ? pile
         ? `Beat ${cardsText(pile)}: ${pile.length === 1 ? 'a higher card or any three of a kind' : pile.length === 2 ? 'a higher pair or any four of a kind' : `a higher ${pile.length === 3 ? 'three' : 'four'} of a kind`}`
@@ -52,7 +58,7 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
               aria-label={cardsText([c])}
               disabled={!give && !myTurn}
               onClick={() => toggle(c)}
-              className={`-ml-4 rounded-md transition-transform first:ml-0 focus-visible:outline-2 focus-visible:outline-yellow-300 disabled:cursor-default sm:-ml-5 ${on ? '-translate-y-3' : ''}`}
+              className={`-ml-4 rounded-md transition-transform first:ml-0 focus-visible:outline-2 focus-visible:outline-yellow-300 disabled:cursor-default sm:-ml-5 ${on ? '-translate-y-3' : ''} ${got.includes(c) ? 'relative ring-3 ring-yellow-300' : ''}`}
             >
               <CardFace card={c} />
             </button>

@@ -164,15 +164,20 @@ export default function SlaveTable({ state, heroId, invite, odds }: Props) {
     );
   } else {
     const pile = state.pile;
-    middle = pile ? (
+    middle = (
       <div className="flex flex-col items-center gap-1.5">
-        <div key={pile.cards.join()} className="rise-in flex gap-1">
-          {pile.cards.map((c) => <CardFace key={c} card={c} />)}
-        </div>
-        <p className={caption}>{nameOf(pile.by)} played</p>
+        {pile ? (
+          <>
+            <div key={pile.cards.join()} className="rise-in flex gap-1">
+              {pile.cards.map((c) => <CardFace key={c} card={c} />)}
+            </div>
+            <p className={caption}>{nameOf(pile.by)} played</p>
+          </>
+        ) : (
+          <p className="text-sm font-semibold text-yellow-50 sm:text-base">{nameOf(state.activeId ?? '')} lead{state.activeId === heroId ? '' : 's'}</p>
+        )}
+        <p className="text-[10px] tracking-wider text-yellow-100/50 uppercase sm:text-xs">Turns go {state.dir === 1 ? 'clockwise ↻' : 'counter-clockwise ↺'}</p>
       </div>
-    ) : (
-      <p className="text-sm font-semibold text-yellow-50 sm:text-base">{nameOf(state.activeId ?? '')} lead{state.activeId === heroId ? '' : 's'}</p>
     );
   }
 
