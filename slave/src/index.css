@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import "../../room.css";
+
+
+
+/* Wide AND tall screens get the biggest table sizes; short laptop screens keep the mid sizes. */
+@custom-variant tall (@media (min-width: 64rem) and (min-height: 50rem));
+
+@theme {
+  --color-slate-950: #141c18;
+  --color-slate-900: #222e27;
+  --color-slate-800: #334138;
+  --color-slate-700: #4b584e;
+  --color-slate-500: #899384;
+  --color-slate-400: #b5bdab;
+  --color-slate-300: #cbd0bf;
+  --color-slate-200: #e1e2d4;
+  --color-slate-100: #f0edde;
+  --color-slate-50: #fffaf0;
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "Courier New", monospace;
+}
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes turn-drain {
+  from {
+    transform: scaleX(1);
+    background-color: #facc15;
+  }
+  70% {
+    background-color: #fbbf24;
+  }
+  to {
+    transform: scaleX(0);
+    background-color: #f43f5e;
+  }
+}
+
+.turn-timer {
+  transform-origin: left;
+  animation-name: turn-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Reduce Motion: nothing moves, but things still appear in order, so a fade keeps each one's delay. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation-name: fade-in;
+  }
+}

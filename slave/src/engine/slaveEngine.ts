@@ -1,0 +1,348 @@
+import type { Card, GameState, Player, PlayerAction, Title } from '../types/slave';
+
+export const MAX_SEATS = 8;
+/** Starting with fewer players fills the table to this with bots. */
+export const MIN_TABLE = 4;
+export const MAX_QUEUE = 20;
+export const TURN_MS = 30_000;
+export const SETTLE_MS = 8_000;
+export const IDLE_MS = 5 * 60_000;
+export const isBot = (id: string) => /^bot:\d+$/.test(id);
+const BOT_DELAY_MS = 900;
+
+// ------------------------------------------------ cards
+
+/** 3 is the lowest card and 2 the highest. Suits never matter. */
+export const RANKS = '3456789TJQKA2';
+export const rank = (c: Card) => RANKS.indexOf(c[0]);
+const SUITS = 'cdhs';
+/** Low to high, clubs first within a rank. */
+export const sortCards = (cards: Card[]) => [...cards].sort((a, b) => rank(a) - rank(b) || SUITS.indexOf(a[1]) - SUITS.indexOf(b[1]));
+
+/** Unbiased crypto-random integer in [0, n). */
+function randomInt(n: number): number {
+  const limit = 2 ** 32 - (2 ** 32 % n);
+  const buf = new Uint32Array(1);
+  do crypto.getRandomValues(buf);
+  while (buf[0] >= limit);
+  return buf[0] % n;
+}
+
+/** One fresh deck per round, Fisher-Yates shuffled. No jokers. */
+function newDeck(): Card[] {
+  const d = [...RANKS].flatMap((r) => [...SUITS].map((s) => `${r}${s}` as Card));
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+/**
+ * One to four cards of one rank. Anything goes on an empty pile; otherwise the same count of a higher rank.
+ * Three of a kind (ตอง) also beats any single, and four of a kind any pair.
+ */
+export function beats(cards: Card[], pile: Card[] | null): boolean {
+  if (!cards.length || cards.length > 4 || cards.some((c) => c[0] !== cards[0][0])) return false;
+  if (!pile) return true;
+  if (cards.length === pile.length) return rank(cards[0]) > rank(pile[0]);
+  return (pile.length === 1 && cards.length === 3) || (pile.length === 2 && cards.length === 4);
+}
+
+/** Titles down a final ranking of n players. Queen and Serf need four players. */
+export function titles(n: number): Title[] {
+  const t: Title[] = Array(n).fill('Citizen');
+  if (n >= 4) [t[1], t[n - 2]] = ['Queen', 'Serf'];
+  t[0] = 'King';
+  t[n - 1] = 'Slave';
+  return t;
+}
+
+/** Finishing order after the falls: a King who isn't first out drops to Slave; a Queen who then isn't in the top two drops to Serf. */
+export function ranking(out: string[], king?: string, queen?: string): string[] {
+  const r = [...out];
+  const drop = (id: string, fromEnd: number) => {
+    r.splice(r.indexOf(id), 1);
+    r.splice(r.length + 1 - fromEnd, 0, id);
+  };
+  if (king && r.includes(king) && r[0] !== king) drop(king, 1);
+  const q = queen ? r.indexOf(queen) : -1;
+  if (r.length >= 4 && q > 1 && q < r.length - 2) drop(queen!, 2); // already Serf or Slave: stays there
+  return r;
+}
+
+/** Bots and timeouts: lead the lowest rank you hold, follow with the lowest play that beats the pile. `hand` is sorted. */
+export function botMove(hand: Card[], pile: Card[] | null): Card[] | null {
+  // ponytail: greedy, no bombs and no saving 2s for later; smarter bots when players ask.
+  const groups: Card[][] = [];
+  for (const c of hand) {
+    const last = groups.at(-1);
+    if (last && last[0][0] === c[0]) last.push(c);
+    else groups.push([c]);
+  }
+  if (!pile) return groups[0] ?? null;
+  return groups.map((g) => g.slice(0, pile.length)).find((g) => beats(g, pile)) ?? null;
+}
+
+// ------------------------------------------------ helpers
+
+const update = (state: GameState, fn: (s: GameState) => void): GameState => {
+  const s = structuredClone(state);
+  fn(s);
+  return s;
+};
+
+const find = (s: GameState, id: string) => s.players.find((p) => p.id === id);
+/** First of `among` clockwise after `id`'s seat. */
+const nextAfter = (s: GameState, id: string, among: Player[]) => {
+  const seat = find(s, id)?.seat ?? -1;
+  return among.find((p) => p.seat > seat) ?? among[0];
+};
+
+function seat(s: GameState, id: string, name: string, connected: boolean) {
+  const taken = new Set(s.players.map((p) => p.seat));
+  let free = 0;
+  while (taken.has(free)) free++;
+  s.players.push({ id, name, seat: free, hand: [], title: null, points: 0, connected, left: false });
+  s.players.sort((a, b) => a.seat - b.seat);
+}
+
+/**
+ * Display names as shown to everyone: invisible and control characters removed (they can reverse or hide
+ * text next to the name), whitespace trimmed, at most 20 characters. Zero-width joiners stay, so emoji
+ * sequences still render. Empty result: "Player".
+ */
+export function cleanName(name: unknown): string {
+  const text = typeof name === 'string' ? name : '';
+  return [...text.replace(/(?!\u200D)[\p{Cc}\p{Cf}\u2028\u2029]/gu, '').trim()].slice(0, 20).join('').trim() || 'Player';
+}
+
+// ------------------------------------------------ lobby
+
+export function createGame(roomCode: string, now: number): GameState {
+  return {
+    roomCode, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [],
+    pile: null, passed: [], out: [], gives: [], activeId: null, deadline: null, nextRoundAt: null, lastActionAt: now,
+  };
+}
+
+/** Seat before the game starts; afterwards (or when full) join the queue for the next round. */
+export function addPlayer(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (isBot(id)) return state;
+  const name = cleanName(rawName);
+  if (!find(state, id) && !state.queue.some((q) => q.id === id) && state.queue.length >= MAX_QUEUE && (state.started || state.players.length >= MAX_SEATS))
+    return state; // table and queue full
+  return update(state, (s) => {
+    s.lastActionAt = now;
+    s.spectators = s.spectators.filter((w) => w.id !== id); // a spectator taking a seat
+    const known = find(s, id) ?? s.queue.find((q) => q.id === id);
+    if (known) {
+      known.name = name;
+      known.connected = true;
+    } else if (!s.started && s.players.length < MAX_SEATS) {
+      seat(s, id, name, true);
+    } else {
+      s.queue.push({ id, name, connected: true });
+    }
+  });
+}
+
+/** Host-owned seat; queued during play. */
+export function addBot(state: GameState, now: number): GameState {
+  if (state.players.length + state.queue.length >= MAX_SEATS) return state;
+  return update(state, (s) => {
+    const number = Math.max(0, ...[...s.players, ...s.queue].map((p) => Number(/^bot:(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1;
+    const id = `bot:${number}`;
+    const name = `Bot ${number}`;
+    if (!s.started) seat(s, id, name, true);
+    else s.queue.push({ id, name, connected: true });
+    s.lastActionAt = now;
+  });
+}
+
+export function setConnected(state: GameState, id: string, connected: boolean): GameState {
+  return update(state, (s) => {
+    const p = find(s, id) ?? s.queue.find((q) => q.id === id) ?? s.spectators.find((w) => w.id === id);
+    if (p) p.connected = connected;
+  });
+}
+
+/** Between rounds the seat goes at once; mid-round it plays itself out and goes at the next deal. */
+export function removePlayer(state: GameState, id: string, now: number): GameState {
+  return update(state, (s) => {
+    s.lastActionAt = now;
+    s.queue = s.queue.filter((q) => q.id !== id);
+    s.spectators = s.spectators.filter((w) => w.id !== id);
+    const p = find(s, id);
+    if (!p) return;
+    if (s.phase === 'playing' || s.phase === 'exchange') p.left = true;
+    else s.players = s.players.filter((x) => x !== p);
+  });
+}
+
+/** Watching the table, not playing. */
+export const isSpectator = (s: GameState, id: string) => s.spectators.some((w) => w.id === id);
+
+/** Join to watch. A seated or queued player who comes back this way stays a player. */
+export function addSpectator(state: GameState, id: string, rawName: string, now: number): GameState {
+  if (find(state, id) || state.queue.some((q) => q.id === id)) return addPlayer(state, id, rawName, now);
+  const name = cleanName(rawName);
+  return update(state, (s) => {
+    s.lastActionAt = now;
+    const known = s.spectators.find((w) => w.id === id);
+    if (known) Object.assign(known, { name, connected: true });
+    else s.spectators.push({ id, name, connected: true });
+  });
+}
+
+export function startGame(state: GameState, now: number): GameState {
+  if (state.started || state.players.length < 1) return state;
+  let s = state;
+  while (s.players.length < MIN_TABLE) s = addBot(s, now);
+  return update(s, (x) => {
+    x.started = true;
+    x.lastActionAt = now;
+    startRound(x, now);
+  });
+}
+
+// ------------------------------------------------ round flow
+
+/** Mutates: seat the queue, deal the whole deck, then the exchange. `deck` lets tests stack the cards. */
+export function startRound(s: GameState, now: number, deck?: Card[]) {
+  s.players = s.players.filter((p) => !p.left);
+  while (s.players.length < MAX_SEATS && s.queue.length) {
+    const q = s.queue.shift()!;
+    seat(s, q.id, q.name, q.connected);
+  }
+  Object.assign(s, { pile: null, passed: [], out: [], gives: [], activeId: null, deadline: null, nextRoundAt: null });
+  for (const p of s.players) p.hand = [];
+  if (s.players.length < 2) return void (s.phase = 'waiting');
+  (deck ?? newDeck()).forEach((c, i) => s.players[i % s.players.length].hand.push(c));
+  for (const p of s.players) p.hand = sortCards(p.hand);
+  s.round++;
+  // Up the ladder the best cards go automatically; the King and Queen then pick the same number to give back.
+  const titled = (t: Title) => s.players.find((p) => p.title === t);
+  for (const [low, high, count] of [['Slave', 'King', 2], ['Serf', 'Queen', 1]] as const) {
+    const from = titled(low), to = titled(high);
+    if (!from || !to) continue;
+    const cards = from.hand.splice(-count);
+    to.hand = sortCards([...to.hand, ...cards]);
+    s.gives.push({ from: from.id, to: to.id, count, cards }, { from: to.id, to: from.id, count, cards: [] });
+  }
+  if (!s.gives.length) return lead(s, now);
+  s.phase = 'exchange';
+  s.deadline = now + TURN_MS;
+}
+
+/** Last round's Slave leads; the first round, whoever holds 3♣. */
+function lead(s: GameState, now: number) {
+  const first = s.players.find((p) => p.title === 'Slave') ?? s.players.find((p) => p.hand.includes('3c'))!;
+  Object.assign(s, { phase: 'playing', activeId: first.id, deadline: now + TURN_MS });
+}
+
+/** After a play or a pass: the next player still in on this pile, or a fresh lead once everyone else has passed. */
+function next(s: GameState, from: string, now: number) {
+  const live = s.players.filter((p) => p.hand.length);
+  if (live.length <= 1) return settle(s, live, now);
+  const pile = s.pile!;
+  const waiting = live.filter((p) => p.id !== pile.by && !s.passed.includes(p.id));
+  if (waiting.length) s.activeId = nextAfter(s, from, waiting).id;
+  else {
+    // Whoever played the pile leads; if they're out, the next player on.
+    s.activeId = live.some((p) => p.id === pile.by) ? pile.by : nextAfter(s, pile.by, live).id;
+    Object.assign(s, { pile: null, passed: [] });
+  }
+  s.deadline = now + TURN_MS;
+}
+
+function settle(s: GameState, live: Player[], now: number) {
+  s.out.push(...live.map((p) => p.id));
+  const order = ranking(s.out, s.players.find((p) => p.title === 'King')?.id, s.players.find((p) => p.title === 'Queen')?.id);
+  const t = titles(order.length);
+  order.forEach((id, i) => {
+    const p = find(s, id)!;
+    p.title = t[i];
+    p.points += order.length - 1 - i;
+  });
+  // The last play stays on show until the next deal.
+  Object.assign(s, { phase: 'settled', activeId: null, deadline: null, passed: [], nextRoundAt: now + SETTLE_MS });
+}
+
+// ------------------------------------------------ actions
+
+function own(p: Player, cards: Card[]) {
+  if (new Set(cards).size !== cards.length || !cards.every((c) => c !== '??' && p.hand.includes(c))) throw new Error("You don't hold those cards");
+  return cards;
+}
+
+function act(s: GameState, id: string, action: PlayerAction, now: number) {
+  const p = find(s, id);
+  if (!p) throw new Error("You're not seated");
+
+  if (action.type === 'give') {
+    const g = s.gives.find((x) => x.from === id && !x.cards.length);
+    if (s.phase !== 'exchange' || !g) throw new Error('Nothing to give');
+    const cards = own(p, action.cards);
+    if (cards.length !== g.count) throw new Error(`Give ${g.count} card${g.count > 1 ? 's' : ''}`);
+    p.hand = p.hand.filter((c) => !cards.includes(c));
+    const to = find(s, g.to)!;
+    to.hand = sortCards([...to.hand, ...cards]);
+    g.cards = sortCards(cards);
+    if (s.gives.every((x) => x.cards.length)) lead(s, now);
+    return;
+  }
+
+  if (s.phase !== 'playing' || s.activeId !== id) throw new Error('Not your turn');
+  if (action.type === 'pass') {
+    if (!s.pile) throw new Error('You lead: play something');
+    s.passed.push(id);
+  } else {
+    const cards = own(p, action.cards);
+    if (!beats(cards, s.pile?.cards ?? null)) throw new Error(s.pile ? "That doesn't beat the pile" : 'Play one to four cards of one rank');
+    p.hand = p.hand.filter((c) => !cards.includes(c));
+    s.pile = { by: id, cards: sortCards(cards) };
+    if (!p.hand.length) s.out.push(id);
+  }
+  next(s, id, now);
+}
+
+export function applyAction(state: GameState, id: string, action: PlayerAction, now: number): GameState {
+  return update(state, (s) => {
+    act(s, id, action, now);
+    s.lastActionAt = now;
+  });
+}
+
+/** What a bot does now. A player who runs out of time gives their lowest cards and passes (or leads their lowest). */
+function autoAction(s: GameState, id: string, bot: boolean): PlayerAction {
+  const p = find(s, id)!;
+  const g = s.gives.find((x) => x.from === id && !x.cards.length);
+  if (s.phase === 'exchange' && g) return { type: 'give', cards: p.hand.slice(0, g.count) };
+  if (!bot && s.pile) return { type: 'pass' };
+  const cards = botMove(p.hand, s.pile?.cards ?? null);
+  return cards ? { type: 'play', cards } : { type: 'pass' };
+}
+
+/** Host clock: bots, timeouts, the next round. Returns the same object when nothing changed. */
+export function hostTick(state: GameState, now: number): GameState {
+  const { phase, deadline } = state;
+  // Bots and players who left move after a short pause; everyone else when their time runs out.
+  const auto = (id: string) => isBot(id) || !!find(state, id)?.left;
+  const due = (id: string) => deadline !== null && (now >= deadline || (auto(id) && now >= deadline - TURN_MS + BOT_DELAY_MS));
+  const mover = phase === 'exchange' ? state.gives.find((g) => !g.cards.length && due(g.from))?.from : phase === 'playing' && state.activeId && due(state.activeId) ? state.activeId : null;
+  if (mover) return update(state, (s) => act(s, mover, autoAction(s, mover, auto(mover)), now));
+  if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && state.players.length + state.queue.length >= 2))) {
+    return update(state, (s) => startRound(s, now));
+  }
+  return state;
+}
+
+/** What one viewer may see: only their own hand, and only exchanges they're part of. Spectators see everything. */
+export function maskFor(state: GameState, viewerId: string): GameState {
+  if (isSpectator(state, viewerId)) return state;
+  return update(state, (s) => {
+    for (const p of s.players) if (p.id !== viewerId) p.hand = p.hand.map(() => '??');
+    for (const g of s.gives) if (g.from !== viewerId && g.to !== viewerId) g.cards = g.cards.map(() => '??');
+  });
+}
