@@ -40,7 +40,7 @@ export const RULES: Page[] = [
   {
     title: 'The exchange',
     picture: <div className="htp-row"><Tag>Slave → King: best 2</Tag><Tag>King → Slave: any 2</Tag></div>,
-    text: <>At each deal the Slave hands the King their <b>two best cards</b>, and the Serf hands the Queen their <b>best one</b>. The King and Queen then choose the same number of cards to give back. Then whoever holds 3♣ leads, and turns go whichever way round reaches the Slave sooner (clockwise on a tie).</>,
+    text: <>At each deal the Slave's <b>two best cards</b> are set aside for the King, and the Serf's <b>best one</b> for the Queen. The King and Queen pick the same number from their own hand to give back. When everyone has picked, <b>the cards change hands all at once</b>. Then whoever holds 3♣ leads, and turns go whichever way round reaches the Slave sooner (clockwise on a tie).</>,
   },
   {
     title: 'Keep your crown',

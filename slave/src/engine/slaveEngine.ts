@@ -160,7 +160,7 @@ export function cleanName(name: unknown): string {
 export function createGame(roomCode: string, now: number): GameState {
   return {
     roomCode, started: false, phase: 'waiting', round: 0, players: [], queue: [], spectators: [],
-    pile: null, passed: [], out: [], gives: [], activeId: null, dir: 1, deadline: null, nextRoundAt: null, lastActionAt: now,
+    pile: null, passed: [], out: [], gives: [], swapped: false, activeId: null, dir: 1, deadline: null, nextRoundAt: null, lastActionAt: now,
   };
 }
 
@@ -253,20 +253,19 @@ export function startRound(s: GameState, now: number, deck?: Card[]) {
     const q = s.queue.shift()!;
     seat(s, q.id, q.name, q.connected);
   }
-  Object.assign(s, { pile: null, passed: [], out: [], gives: [], activeId: null, dir: 1, deadline: null, nextRoundAt: null });
+  Object.assign(s, { pile: null, passed: [], out: [], gives: [], swapped: false, activeId: null, dir: 1, deadline: null, nextRoundAt: null });
   for (const p of s.players) p.hand = [];
   if (s.players.length < 2) return void (s.phase = 'waiting');
   (deck ?? newDeck()).forEach((c, i) => s.players[i % s.players.length].hand.push(c));
   for (const p of s.players) p.hand = sortCards(p.hand);
   s.round++;
-  // Up the ladder the best cards go automatically; the King and Queen then pick the same number to give back.
+  // Up the ladder the best cards are set aside at once; the King and Queen pick the same number from their own hand
+  // to give back. Nothing changes hands until every give is chosen (see swap).
   const titled = (t: Title) => s.players.find((p) => p.title === t);
   for (const [low, high, count] of [['Slave', 'King', 2], ['Serf', 'Queen', 1]] as const) {
     const from = titled(low), to = titled(high);
     if (!from || !to) continue;
-    const cards = from.hand.splice(-count);
-    to.hand = sortCards([...to.hand, ...cards]);
-    s.gives.push({ from: from.id, to: to.id, count, cards }, { from: to.id, to: from.id, count, cards: [] });
+    s.gives.push({ from: from.id, to: to.id, count, cards: from.hand.slice(-count) }, { from: to.id, to: from.id, count, cards: [] });
   }
   if (!s.gives.length) return lead(s, now);
   s.phase = 'exchange';
@@ -300,6 +299,19 @@ function next(s: GameState, from: string, now: number) {
   s.deadline = now + TURN_MS;
 }
 
+/** Every give is chosen: all the cards change hands at once, and the swap stays on show before the first lead. */
+function swap(s: GameState, now: number) {
+  for (const g of s.gives) {
+    const from = find(s, g.from)!;
+    from.hand = from.hand.filter((c) => !g.cards.includes(c));
+  }
+  for (const g of s.gives) {
+    const to = find(s, g.to)!;
+    to.hand = sortCards([...to.hand, ...g.cards]);
+  }
+  Object.assign(s, { swapped: true, deadline: now + EXCHANGE_SHOW_MS });
+}
+
 function settle(s: GameState, live: Player[], now: number) {
   s.out.push(...live.map((p) => p.id));
   const order = ranking(s.out, s.players.find((p) => p.title === 'King')?.id, s.players.find((p) => p.title === 'Queen')?.id);
@@ -329,11 +341,8 @@ function act(s: GameState, id: string, action: PlayerAction, now: number) {
     if (s.phase !== 'exchange' || !g) throw new Error('Nothing to give');
     const cards = own(p, action.cards);
     if (cards.length !== g.count) throw new Error(`Give ${g.count} card${g.count > 1 ? 's' : ''}`);
-    p.hand = p.hand.filter((c) => !cards.includes(c));
-    const to = find(s, g.to)!;
-    to.hand = sortCards([...to.hand, ...cards]);
     g.cards = sortCards(cards);
-    if (s.gives.every((x) => x.cards.length)) s.deadline = now + EXCHANGE_SHOW_MS; // hostTick leads once it's shown
+    if (s.gives.every((x) => x.cards.length)) swap(s, now);
     return;
   }
 
@@ -378,7 +387,7 @@ export function hostTick(state: GameState, now: number): GameState {
   const due = (id: string) => deadline !== null && (now >= deadline || (auto(id) && now >= deadline - TURN_MS + pause));
   const mover = phase === 'exchange' ? state.gives.find((g) => !g.cards.length && due(g.from))?.from : phase === 'playing' && state.activeId && due(state.activeId) ? state.activeId : null;
   if (mover) return update(state, (s) => act(s, mover, autoAction(s, mover, auto(mover)), now));
-  if (phase === 'exchange' && state.gives.every((g) => g.cards.length) && now >= deadline!) return update(state, (s) => lead(s, now));
+  if (phase === 'exchange' && state.swapped && now >= deadline!) return update(state, (s) => lead(s, now));
   if (state.started && ((phase === 'settled' && now >= state.nextRoundAt!) || (phase === 'waiting' && state.players.length + state.queue.length >= 2))) {
     return update(state, (s) => startRound(s, now));
   }

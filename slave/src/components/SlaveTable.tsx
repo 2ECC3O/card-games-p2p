@@ -1,5 +1,5 @@
 import { WifiSlashIcon } from '@phosphor-icons/react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { TURN_MS } from '../engine/slaveEngine';
 import type { Card, GameState, Player, Title } from '../types/slave';
 
@@ -119,6 +119,7 @@ export default function SlaveTable({ state, heroId, invite, odds }: Props) {
   const heroIndex = Math.max(0, players.findIndex((p) => p.id === heroId));
   const ordered = [...players.slice(heroIndex), ...players.slice(0, heroIndex)]; // you first, then clockwise
   const queuePos = state.queue.findIndex((q) => q.id === heroId);
+  const pointOf = (id: string) => seatPoint(Math.max(0, ordered.findIndex((p) => p.id === id)), ordered.length);
   const caption = 'text-[10px] font-semibold tracking-[0.2em] text-yellow-100/60 uppercase sm:text-xs';
 
   let middle: ReactNode;
@@ -136,14 +137,14 @@ export default function SlaveTable({ state, heroId, invite, odds }: Props) {
   } else if (state.phase === 'exchange') {
     middle = (
       <div className="flex flex-col items-center gap-2">
-        <p className={caption}>Card exchange</p>
+        <p className={caption}>{state.swapped ? 'Cards swapped' : 'Card exchange · picking'}</p>
         {state.gives.map((g) => (
           <div key={`${g.from}-${g.to}`} className="flex items-center gap-2 text-xs text-yellow-50/80 sm:text-sm">
             <span>{nameOf(g.from)} → {nameOf(g.to)}</span>
             {g.cards.length ? (
               <span className="flex gap-1">{g.cards.map((c, i) => <CardFace key={i} card={c} size="sm" />)}</span>
             ) : (
-              <span className="text-yellow-50/50">choosing {g.count}…</span>
+              <span className="text-yellow-50/50">picking {g.count}…</span>
             )}
           </div>
         ))}
@@ -199,6 +200,22 @@ export default function SlaveTable({ state, heroId, invite, odds }: Props) {
           </div>
         );
       })}
+
+      {/* The swap: every exchanged card flies from its giver's seat to its new owner's. */}
+      {state.phase === 'exchange' && state.swapped &&
+        state.gives.map((g, i) => {
+          const from = pointOf(g.from), to = pointOf(g.to);
+          return (
+            <div
+              key={`${state.round}-${i}`}
+              aria-hidden
+              className="card-fly pointer-events-none absolute z-10 flex gap-1"
+              style={{ ...at(from), '--dx': to.x - from.x, '--dy': to.y - from.y, animationDelay: `${i * 200}ms` } as CSSProperties}
+            >
+              {g.cards.map((c, j) => <CardFace key={j} card={c} size="sm" />)}
+            </div>
+          );
+        })}
 
       {state.queue.length > 0 && queuePos < 0 && (
         <p className="absolute top-1 left-3 text-xs text-slate-400 tall:text-sm">In queue: {state.queue.map((q) => q.name).join(', ')}</p>

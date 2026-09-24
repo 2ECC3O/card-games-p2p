@@ -67,6 +67,30 @@ body {
   animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* The exchange: cards fly from the giver's seat (--dx/--dy away, in % of the table) to the receiver's. */
+@keyframes card-fly {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh));
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx) * 1cqw), calc(-50% + var(--dy) * 1cqh)) scale(0.8);
+  }
+}
+
+.card-fly {
+  animation: card-fly 1.6s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+
 /* Reduce Motion: nothing moves, but things still appear in order, so a fade keeps each one's delay. */
 @keyframes fade-in {
   from {
@@ -77,5 +101,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .rise-in {
     animation-name: fade-in;
+  }
+  .card-fly {
+    display: none;
   }
 }

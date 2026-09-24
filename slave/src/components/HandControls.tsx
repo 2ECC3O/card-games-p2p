@@ -32,14 +32,20 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
   };
   const toggle = (c: Card) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...chosen, c]));
   const nameOf = (id: string) => state.players.find((p) => p.id === id)?.name ?? 'someone';
-  // The exchange, as it happens: what came in (highlighted in your hand) and what went out.
-  const swaps = state.phase === 'exchange' ? state.gives.filter((g) => g.cards.length && (g.to === heroId || g.from === heroId)) : [];
-  const got = swaps.filter((g) => g.to === heroId).flatMap((g) => g.cards);
-  const swapText = swaps.map((g) => (g.to === heroId ? `got ${cardsText(g.cards)} from ${nameOf(g.from)}` : `gave ${cardsText(g.cards)} to ${nameOf(g.to)}`)).join(' and ');
+  // The exchange: your cards going out are dimmed until everyone has picked; then they all change hands at once and
+  // the ones you got are highlighted.
+  const mine = state.phase === 'exchange' ? state.gives.filter((g) => g.from === heroId || g.to === heroId) : [];
+  const outgoing = state.swapped ? [] : mine.filter((g) => g.from === heroId).flatMap((g) => g.cards);
+  const got = state.swapped ? mine.filter((g) => g.to === heroId).flatMap((g) => g.cards) : [];
+  const incoming = mine.find((g) => g.to === heroId);
+  const coming = incoming && (incoming.cards.length ? `${nameOf(incoming.from)} gives you ${cardsText(incoming.cards)}` : `${nameOf(incoming.from)} is picking ${incoming.count} for you`);
+  const going = mine.filter((g) => g.from === heroId && g.cards.length).map((g) => `${cardsText(g.cards)} to ${nameOf(g.to)}`).join(', ');
   const hint = give
-    ? `Pick ${give.count} card${give.count > 1 ? 's' : ''} to give ${nameOf(give.to)}.${swapText ? ` You ${swapText}.` : ''}`
-    : swapText
-      ? `You ${swapText}.`
+    ? `Pick ${give.count} card${give.count > 1 ? 's' : ''} to give ${nameOf(give.to)}.${coming ? ` ${coming}.` : ''}`
+    : mine.length && state.swapped
+      ? `You gave ${going} and got ${cardsText(got)} from ${nameOf(incoming!.from)}.`
+    : mine.length
+      ? `Waiting for everyone to pick. You give ${going}; ${coming}.`
     : myTurn
       ? pile
         ? `Beat ${cardsText(pile)}: ${pile.length === 1 ? 'a higher card or any three of a kind' : pile.length === 2 ? 'a higher pair or any four of a kind' : `a higher ${pile.length === 3 ? 'three' : 'four'} of a kind`}`
@@ -59,7 +65,7 @@ export default function HandControls({ state, heroId, onAction, status }: Props)
               aria-label={cardsText([c])}
               disabled={!give && !myTurn}
               onClick={() => toggle(c)}
-              className={`-ml-4 rounded-md transition-transform first:ml-0 focus-visible:outline-2 focus-visible:outline-yellow-300 disabled:cursor-default sm:-ml-5 ${on ? '-translate-y-3' : ''} ${got.includes(c) ? 'relative ring-3 ring-yellow-300' : ''}`}
+              className={`-ml-4 rounded-md transition-transform first:ml-0 focus-visible:outline-2 focus-visible:outline-yellow-300 disabled:cursor-default sm:-ml-5 ${on ? '-translate-y-3' : ''} ${got.includes(c) ? 'relative ring-3 ring-yellow-300' : ''} ${outgoing.includes(c) ? 'opacity-40' : ''}`}
             >
               <CardFace card={c} />
             </button>

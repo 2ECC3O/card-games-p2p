@@ -29,12 +29,12 @@ export interface QueuedPlayer {
   connected: boolean;
 }
 
-/** Cards passed at the start of a round. Up the ladder it's the giver's best, automatically; down it's the giver's pick. */
+/** Cards passed at the start of a round. Up the ladder it's the giver's best, chosen at the deal; down it's the giver's pick. Nothing moves until every give is chosen. */
 export interface Give {
   from: string;
   to: string;
   count: number;
-  /** Empty until given. */
+  /** Empty until chosen. */
   cards: Card[];
 }
 
@@ -57,6 +57,8 @@ export interface GameState {
   /** Finishing order this round. */
   out: string[];
   gives: Give[];
+  /** Every give chosen and the cards have changed hands. */
+  swapped: boolean;
   activeId: string | null;
   /** Turn order this round: 1 clockwise (up the seats), −1 the other way. */
   dir: 1 | -1;

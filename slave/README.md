@@ -31,9 +31,11 @@ own engine and table, in plum.
 - **Titles:** first out is **King**, second **Queen**, second-last **Serf** (รองสลาฟ), last **Slave**, everyone else
   **Citizen**. With 3 players there's no Queen or Serf; with 2, just King and Slave.
 - **Falls:** a King who isn't first out drops to Slave. A Queen who then isn't in the top two drops to Serf.
-- **Exchange (30 s):** at each deal the Slave's two best cards go to the King and the Serf's best card to the
-  Queen. The King and Queen then pick the same number of cards to give back. Time out and you give back your lowest.
-  Cards you receive are highlighted, and the exchange stays on the table for 4 seconds before the first lead.
+- **Exchange (30 s):** at each deal the Slave's two best cards are set aside for the King and the Serf's best card
+  for the Queen; they show dimmed in the giver's hand. The King and Queen pick the same number from their own hand
+  to give back (time out and you give back your lowest). Nothing moves until everyone has picked; then every card
+  changes hands at once, flying across the table, the cards you got are highlighted, and the swap stays on the
+  table for 4 seconds before the first lead.
 - **Points:** finishing k-th of n earns n − k points, for the TOURNAMENT display's leaderboard.
 - **Bots** go out whenever one play empties their hand. They lead their lowest rank whole; against a player on one
   card they lead a pair or more, or their highest single. They follow with the lowest set that fits, breaking up a

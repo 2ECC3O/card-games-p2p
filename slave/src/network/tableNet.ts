@@ -8,7 +8,7 @@ import { iceServers } from './iceServers';
 import { sha256 } from './sha256';
 
 // Bump the version whenever the wire format changes, so old and new pages never meet in one room.
-const PREFIX = 'p2p-slave-v3-';
+const PREFIX = 'p2p-slave-v4-';
 const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;

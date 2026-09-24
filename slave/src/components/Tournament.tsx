@@ -10,8 +10,9 @@ function describe(prev: GameState, state: GameState): TickerLine[] {
   if (!same) lines.push({ text: `Round ${state.round}` });
   for (const g of state.gives) {
     const before = same ? prev.gives.find((x) => x.from === g.from && x.to === g.to) : undefined;
-    if (g.cards.length && !before?.cards.length) lines.push({ text: `${nameOf(state, g.from)} gives ${nameOf(state, g.to)} ${cardsText(g.cards)}` });
+    if (g.cards.length && !before?.cards.length) lines.push({ text: `${nameOf(state, g.from)} picks ${cardsText(g.cards)} for ${nameOf(state, g.to)}` });
   }
+  if (state.swapped && !prev.swapped) lines.push({ text: 'Cards change hands' });
   if (state.phase === 'playing' && prev.phase !== 'playing') lines.push({ text: `${nameOf(state, state.activeId)} has 3♣ and leads; turns go ${state.dir === 1 ? 'clockwise' : 'counter-clockwise'}` });
   if (state.pile && state.pile.cards.join() !== prev.pile?.cards.join()) lines.push({ text: `${nameOf(state, state.pile.by)}: ${cardsText(state.pile.cards)}` });
   for (const id of state.passed) if (!prev.passed.includes(id)) lines.push({ text: `${nameOf(state, id)} passes` });
