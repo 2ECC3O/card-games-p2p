@@ -7,7 +7,7 @@ export { randomRoomCode, type Identity, type NetStatus } from '../../../shared/t
 /** Slave's side of the shared room: the engine, the room-id prefix and the shape of a move. */
 const rules: Rules<GameState, PlayerAction> = {
   ...engine,
-  prefix: 'p2p-slave-v4-',
+  prefix: 'p2p-slave-v5-',
   validAction: (a): a is PlayerAction => {
     const x = a as PlayerAction | null;
     return !!x && (x.type === 'pass'

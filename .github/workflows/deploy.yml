@@ -5,6 +5,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # One deployment at a time; a newer push waits for the running one.
@@ -26,6 +28,7 @@ jobs:
 
       # One install for every game (npm workspaces), then every game's tests and build.
       - run: npm ci
+      - run: npm audit --audit-level=high --ignore-scripts
       - run: npm test
       - run: npm run build
         env:
@@ -44,6 +47,7 @@ jobs:
           path: site/
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

@@ -7,7 +7,7 @@ export { randomRoomCode, type Identity, type NetStatus } from '../../../shared/t
 /** Roulette's side of the shared room: the engine, the room-id prefix and the shape of a move. */
 const rules: Rules<GameState, PlayerAction> = {
   ...engine,
-  prefix: 'p2p-roulette-v4-',
+  prefix: 'p2p-roulette-v5-',
   // The engine checks the spot itself against the board.
   validAction: (a): a is PlayerAction => {
     const x = a as PlayerAction | null;

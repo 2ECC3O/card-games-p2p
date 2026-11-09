@@ -62,12 +62,20 @@ Same design as Hold'em P2P:
 - `src/engine/blackjackEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
 - `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
   its room prefix and the shape of a valid move. The host checks every action, then sends each player their view
-  (`maskFor`: no shoe, and the dealer's hole card face down until the dealer plays). A standby player holds
-  a snapshot and takes over if the host drops; reload reconnects to your seat within 60 seconds.
+  (`maskFor`: no shoe, and the dealer's hole card face down until the dealer plays). Spectators retain full
+  hand visibility. A connected participant is automatically selected for full-state backup and continues
+  the same hand if the host drops, without setup. That backup can inspect all cards and the shoe.
+  Reload reconnects to your seat within 60 seconds.
 - `src/components/BlackjackTable.tsx`, `ActionControls.tsx`: the table and the bet / play controls.
 
 Timings and limits live at the top of the engine (`BET_MS`, `TURN_MS`, `SETTLE_MS`, `MAX_SEATS`, `MAX_HANDS`).
-When the wire format changes, bump `prefix` in `src/network/tableNet.ts` so old and new pages never share a room.
+Connections require **HTTPS or localhost**; plain HTTP LAN addresses are unsupported. Per-tab WebCrypto
+signing keys prove identities without transmitting private keys or raw reconnect secrets. Backup snapshots
+carry public verification keys. The backup is replaced automatically on disconnect, leave, expiry or removal; previously received cards
+cannot be erased. See [signed authentication and failover](../poker/README.md#identity-and-reconnecting).
+
+When the wire format changes, bump `prefix` in `src/network/tableNet.ts` (currently `p2p-blackjack-v4-`)
+so old and new pages never share a room.
 
 ## License
 

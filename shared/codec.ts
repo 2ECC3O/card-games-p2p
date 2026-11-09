@@ -36,9 +36,9 @@ export const encode = (msg: unknown): Promise<Uint8Array> =>
   pipe(new TextEncoder().encode(JSON.stringify(msg)), new CompressionStream('deflate-raw'), Infinity);
 
 /** Rejects on anything that isn't a compressed JSON message within the size limits; callers drop those. */
-export async function decode(data: unknown): Promise<unknown> {
+export async function decode(data: unknown, options: { maxUnpacked?: number } = {}): Promise<unknown> {
   const bytes = data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : null;
   if (!bytes) throw new Error('Expected binary data');
   if (bytes.byteLength > MAX_PACKED_BYTES) throw new Error('Message too large');
-  return JSON.parse(new TextDecoder().decode(await pipe(bytes, new DecompressionStream('deflate-raw'), MAX_UNPACKED_BYTES)));
+  return JSON.parse(new TextDecoder().decode(await pipe(bytes, new DecompressionStream('deflate-raw'), Math.min(options.maxUnpacked ?? MAX_UNPACKED_BYTES, MAX_UNPACKED_BYTES))));
 }

@@ -44,7 +44,7 @@ Pool spectators see a rough live rack outlook based on cleared balls and whose t
 |---|---|
 | someone joins late | they wait in a queue and get dealt in at the next hand |
 | a player reloads the page or their phone locks | they keep their seat if they come back within 60 seconds |
-| the person who made the room leaves | another player's browser takes over after about 6 seconds and the game goes on |
+| the person who made the room leaves | a connected participant automatically takes over the same hand after about 6 seconds; no setup is required |
 | a player takes too long | the game moves on for them: check or fold after 60 s in Hold'em, stand after 60 s in blackjack, stay after 60 s in Pok Deng, pass (or lead the lowest card) after 30 s in Slave, betting closes after 30 s in blackjack and Pok Deng and 60 s in roulette, a pool shot is a foul after 90 s |
 | nobody does anything for 5 minutes | the room closes |
 | everyone closes the tab | the room is gone (there's no server keeping it) |
@@ -60,8 +60,20 @@ The person who creates a room is the host. Their browser deals the cards and che
 players connect straight to the host's browser ([WebRTC](https://webrtc.org), with [PeerJS](https://peerjs.com)
 helping them find each other). There's no game server.
 
-Each player's browser only receives the cards that player is allowed to see. The host's browser holds the
-whole deck, though, so play with people you trust.
+Ordinary game views hide opponents' private cards. Spectators and the TOURNAMENT display see all hands.
+A connected player is automatically selected as backup, then a queued participant or spectator if needed.
+The backup receives the full state, including the deck, to resume the exact hand if the host disconnects.
+There is no manual backup setting. This remains a friends-only trust model: a technically skilled host or
+backup can inspect every card. Play with people you trust.
+
+See [deployment security](docs/deployment-security.md) for the protections and limits of GitHub Pages hosting.
+
+Connections require **HTTPS or localhost** for native WebCrypto authentication; plain HTTP LAN addresses
+are unsupported. Each tab keeps an ECDSA P-256 private key in session storage and signs fresh nonce
+challenges bound to the room and both transport peer IDs. Private keys and raw reconnect secrets never
+travel over the network. Public verification keys are pinned across reloads; the authenticated host
+advertises successor keys. First contact still trusts the host. A room retains member key pins after
+departure and accepts at most 256 distinct identities, preventing another signer from claiming an old id.
 
 Pool replays each shot in every browser from the shot's inputs; its physics only uses arithmetic and square roots, so every browser lands on exactly the same result.
 
@@ -105,6 +117,7 @@ npm run dev -w poker
 Open the address it prints. Use `-w blackjack`, `-w roulette`, `-w pool`, `-w pokdeng` or `-w slave` for the other games.
 
 `npm test` runs every game's rule checks and the shared network checks. `npm run build` builds every game into its `dist/`.
+Run `node --import tsx --test shared/tableNet.test.mjs` for the signed authentication and failover checks alone.
 
 ### Visual design
 

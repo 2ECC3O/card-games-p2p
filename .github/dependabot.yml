@@ -2,6 +2,14 @@
 # packages are turned on in the repository settings).
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /ad-video
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     schedule:
