@@ -76,6 +76,33 @@
         gap: 5%;
         padding: 62px 0 58px;
       }
+      .sponsor {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid #a5aa9b;
+        color: #546057;
+      }
+      .sponsor[hidden] {
+        display: none;
+      }
+      .sponsor-label {
+        flex-shrink: 0;
+        font-size: 11px;
+      }
+      .sponsor-slot {
+        flex: 1;
+        min-width: 0;
+        min-height: 90px;
+      }
+      .sponsor-slot .adsbygoogle {
+        display: block;
+        width: 728px;
+        max-width: 100%;
+        height: 90px;
+        margin: auto;
+      }
       .eyebrow {
         display: flex;
         align-items: center;
@@ -322,6 +349,18 @@
         text-underline-offset: 4px;
       }
       @media (max-width: 700px) {
+        .sponsor {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 6px;
+        }
+        .sponsor-slot {
+          min-height: 50px;
+        }
+        .sponsor-slot .adsbygoogle {
+          width: 320px;
+          height: 50px;
+        }
         .masthead {
           min-height: 75px;
         }
@@ -422,6 +461,9 @@
         }
       }
     </style>
+    <script src="home-ads.js" defer></script>
+    <script src="analytics-config.js" defer></script>
+    <script src="analytics.js" defer></script>
   </head>
   <body>
     <div class="wrap">
@@ -433,6 +475,20 @@
           <a href="#tables">The tables</a><a href="#how">How to play ↗</a>
         </nav>
       </header>
+      <!-- Configure approved publisher IDs here; see docs/ads.md before enabling AdSense. -->
+      <aside
+        class="sponsor"
+        id="home-sponsor"
+        aria-label="Advertisement"
+        data-ethicalads-publisher=""
+        data-adsense-client=""
+        data-adsense-slot=""
+        data-adsense-enabled="false"
+        hidden
+      >
+        <span class="sponsor-label">Advertisement</span>
+        <div class="sponsor-slot" id="sponsor-slot"></div>
+      </aside>
       <main>
         <section class="hero">
           <div>

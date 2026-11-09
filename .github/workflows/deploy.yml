@@ -36,7 +36,7 @@ jobs:
       # Every game's build lands in a folder named after it.
       - run: |
           mkdir site
-          cp index.html site/
+          cp index.html home-ads.js analytics-config.js analytics.js site/
           for game in poker blackjack roulette pool pokdeng slave; do cp -r "$game/dist" "site/$game"; done
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

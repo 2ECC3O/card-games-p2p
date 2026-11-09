@@ -108,7 +108,11 @@ Open the address it prints. Use `-w blackjack`, `-w roulette`, `-w pool`, `-w po
 
 ### Visual design
 
-The game picker is plain HTML and CSS, with no JavaScript, downloaded fonts or image assets.
+The game picker is plain HTML and CSS, with a small optional ad loader and no downloaded fonts or image assets.
+Its single advertisement strip is disabled until publisher IDs are configured. See [ad setup](docs/ads.md)
+for EthicalAds with Google AdSense fallback, account applications, and activation steps.
+Optional [analytics](docs/analytics.md) covers the home page and all six games: Cloudflare for public page
+traffic, and Umami for sanitized pageviews and a once-per-visit gameplay signal. Both stay disabled until configured.
 All six games import `room.css` for the shared room setup, controls and the How to play guide. Each game keeps its guide pages in `src/components/rules.tsx`; the guide itself is `shared/HowToPlay.tsx`.
 Their existing card, chip and wheel animations remain in each game's stylesheet.
 Keep the green poker, blue blackjack, red roulette, green felt pool, yellow Pok Deng and plum Slave accents, and check layouts at 375 × 667.

@@ -167,6 +167,9 @@ export class TableNet<S extends RoomState, A> {
 
   act(action: A) {
     this.request({ t: 'act', action });
+    if (!this.destroyed && !this.me.watch && this.rules.validAction(action)) {
+      window.dispatchEvent(new Event('card-games:play'));
+    }
   }
 
   rejoinQueue() {
