@@ -66,8 +66,7 @@ Other commands:
 
 ```bash
 npm test -w poker         # engine self-checks (dealing, betting rules, side pots, chip conservation)
-npm test                  # every game's checks plus shared codec and network security checks
-node --import tsx --test shared/tableNet.test.mjs # signed authentication and failover checks
+npm test                  # every game's checks plus the shared codec and SHA-256 checks
 npm run build -w poker    # type-check and build the finished site into poker/dist/
 npm run preview -w poker  # serve the built dist/ locally
 ```
@@ -78,13 +77,20 @@ npm run preview -w poker  # serve the built dist/ locally
 
 Your local copy from the steps above only runs on your computer. To play it with other people:
 
-### On the same Wi-Fi
+### On the same Wi-Fi, straight from your computer
 
-`http://localhost:5173` works for development on your own computer. Other devices need an HTTPS address
-with a certificate their browser trusts, such as an HTTPS static deployment or a configured local HTTPS
-server. Plain HTTP LAN addresses such as `http://192.168.1.20:5173` are unsupported: room authentication
-requires WebCrypto signing, and the app reports a secure-connection error. Open the HTTPS address before
-creating the room so the invite link and QR code use that address.
+1. Start the dev server so other devices can reach it:
+   ```bash
+   npm run dev -- --host
+   ```
+2. Vite prints a `Network:` address such as `http://192.168.1.20:5173`. **Open the game at that address**
+   on your own computer (not `localhost`) *before* you create the room. The invite link and QR code use
+   whatever address you opened.
+3. Friends scan the QR code or open the link. Windows may ask to let Node through the firewall; allow it.
+
+On a plain `http://` address two phone features are switched off by the browser (see
+[Why HTTPS](#why-https)): the **Share link** button can't share or copy, and the screen won't be kept awake.
+The QR code, room code and the game itself still work.
 
 ### Over the internet
 
@@ -105,16 +111,17 @@ start a deployment by hand from the repository's **Actions** tab (**Deploy to Gi
 
 ### Why HTTPS
 
-A page served over HTTPS (or from `localhost`) counts as a "secure context". Room authentication requires
-WebCrypto signing, so every player needs HTTPS or localhost:
+A page served over HTTPS (or from `localhost`) counts as a "secure context", and browsers only give some
+features to secure pages:
 
 | Feature | Used for | On plain `http://` |
 |---|---|---|
-| WebCrypto signatures | Authenticating players, hosts and backups | Room connection is refused |
 | Web Share API and clipboard | **Share link** button | Does nothing |
 | Screen Wake Lock API | Keeping the phone screen on during a game | Screen dims and locks as usual |
 
-HTTPS also encrypts the page download, so nobody on the same network (for example public Wi-Fi) can alter the game
+The game itself (WebRTC connections, cards, chips) doesn't need HTTPS, so it should also work over plain
+`http://` (`[UNVERIFIED]` on real phones; only tested on `localhost`). HTTPS additionally
+encrypts the page download, so nobody on the same network (for example public Wi-Fi) can alter the game
 files on the way. Static hosts such as Netlify and Cloudflare Pages give you HTTPS automatically.
 
 ### Players on mobile data or strict networks
@@ -161,7 +168,7 @@ Things phones do differently:
 
 - **Screen lock and app switching pause the page.** While you're at a table the app asks the browser to keep
   the screen on (HTTPS only, and the browser may refuse, e.g. in battery saver). If a phone does lock:
-  a connected participant automatically takes over hosting after about 6 seconds. A player whose turn it is
+  the room creator's seat is taken over by another player after about 6 seconds, a player whose turn it is
   gets checked or folded after 60 seconds, and anyone who comes back within 60 seconds keeps their seat.
 - **Sound:** iPhones only allow sound after a tap, so the turn chime is switched on by your first tap on the
   page (Create, Join, Start...). No vibration on iPhones; Safari doesn't support it.
@@ -202,7 +209,7 @@ Things phones do differently:
 
 - **PeerJS** handles the connections. Its free public server is only used to introduce browsers to each
   other (signaling); the game itself travels directly between browsers over WebRTC data channels.
-- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v7-<ROOM CODE>`,
+- The **host** is the browser that created the room. It registers the peer id `p2p-holdem-v5-<ROOM CODE>`,
   runs the game engine, and is the only one allowed to change the game state.
 - **Clients** send their actions (fold, call, raise, rejoin, leave) to the host. The host checks them
   against the rules and sends every player their own view of the new state.
@@ -214,35 +221,32 @@ Things phones do differently:
 
 ### Keeping cards secret
 
-Ordinary game views replace opponents' hidden cards with `??` and remove the deck. Spectators and the
-TOURNAMENT display see all hands. The automatically selected backup receives the entire state, including
-the deck, so it can resume the exact hand. Full-state backup is intentionally trusted; it cannot both
-resume the hand independently and be prevented from inspecting the cards. Use rooms with people you trust.
-Backup snapshots carry public verification keys, never private signing keys or raw reconnect secrets.
+Each player receives a **masked** copy of the state: other players' hole cards are replaced with `??`, and
+the deck is removed. Hole cards are only revealed at a showdown.
+
+One exception, by design: the **standby** (below) receives the full state so it can take over the hand.
+Someone in that seat with browser dev tools open could peek at other players' cards. That trade-off comes
+with peer-to-peer failover. The standby's copy holds only fingerprints of players' reconnect secrets, never
+the secrets themselves, so it can't be used to take over someone else's seat.
 
 ### If the host disconnects
 
 - Every client pings the host every 2 seconds.
-- The first connected player is automatically selected as backup, then a queued participant, then a
-  spectator or tournament display if no player is available. Bots are not eligible. No manual setting is needed.
-- If the host is silent for 6 seconds, the backup loads the latest snapshot, contacts the other browsers,
-  authenticates with its advertised signing key, and keeps trying to claim the existing room code.
-- Cards, bets and the current hand are preserved. There is no refund or redeal.
-- A backup that disconnects, leaves or is removed is replaced automatically while the host is present.
-- Signed evidence from the original host can stop a mistaken takeover; an unsigned refusal cannot.
-- Players keep their seat for 60 seconds after disconnecting. If every browser closes, the room is gone.
+- The **standby** is the first connected non-host player by seat order (then queue order). It also receives
+  a full snapshot of the game after every change.
+- If the host is silent for 6 seconds, the standby promotes itself: it loads the snapshot, contacts every
+  player directly, and keeps trying to take over the room code so new players can still join.
+- A player whose own host is still answering refuses the promotion, which sends a mistaken standby back
+  to being a normal player. Only players the new host contacted itself can do that.
+- Players who drop out keep their seat for 60 seconds. After that they are removed from the table.
 
 ### Identity and reconnecting
 
-Each tab keeps its random id and ECDSA P-256 signing key in `sessionStorage`, so reloads can prove the same
-identity. Native WebCrypto signs fresh nonce challenges bound to the room and both actual transport peer
-IDs. Private keys and raw reconnect secrets never go on the wire; hosts and backup snapshots hold public
-verification keys. Keys are pinned across reloads, and an authenticated host advertises its successor's key.
-The first connection to a host still trusts that host: signatures do not make an unknown host honest.
-
-Member key pins remain after a person leaves or their seat expires, so a different signer cannot claim the
-old id. A room accepts at most 256 distinct identities over its lifetime. Your display name and mute setting
-stay in `localStorage`. Names are cleaned of invisible and text-reversing characters before display.
+Each tab gets a random id and secret, stored in `sessionStorage`. Reloading the tab sends the same id and
+secret, so the host puts you back in your seat. Someone else can't take your seat with your id, because
+the secret won't match. The host keeps only a SHA-256 fingerprint of each secret (`shared/sha256.ts`,
+plain JavaScript so it also works on `http://` pages). Your display name and mute setting are kept in
+`localStorage`. Names are cleaned of invisible and text-reversing characters before anyone sees them.
 
 ### Rules the engine follows
 
@@ -265,13 +269,11 @@ stay in `localStorage`. Names are cleaned of invisible and text-reversing charac
 | `src/engine/pokerEngine.ts` | The rules. Pure functions: deal, betting rounds, side pots (`buildPots`), showdown, turn timeouts (`hostTick`), per-player masking (`maskFor`) |
 | `src/engine/pokerEngine.test.ts` | Engine checks (rules, side pots, hand rankings, names), run with `npm test` |
 | `src/network/pokerNet.ts` | Hold'em's side of the shared room: the engine, the room prefix and the shape of a valid move |
-| `../shared/tableNet.ts` | Host and client networking for every game: message checks, heartbeats, automatic backup snapshots, failover, reconnects |
-| `../shared/identity.ts` | Per-tab WebCrypto signing keys, nonce challenges and signature verification |
+| `../shared/tableNet.ts` | Host and client networking for every game: message checks, heartbeats, standby snapshots, failover, reconnects |
 | `../shared/iceServers.ts` | Which STUN and relay (TURN) servers browsers use, including fetching Open Relay credentials |
 | `../shared/codec.ts` | Compresses and decompresses messages between browsers, with size limits |
-| `../shared/sha256.ts` | Standalone SHA-256 helper; not used to authenticate room identities |
+| `../shared/sha256.ts` | SHA-256, for fingerprinting reconnect secrets |
 | `../shared/network.test.ts` | Checks for the codec, its size limits and SHA-256, run with `npm test` at the root |
-| `../shared/tableNet.test.mjs` | Signed authentication, key pinning, automatic takeover and flood-protection checks |
 | `../shared/lobby.ts` | Seat-free room housekeeping every engine shares: names, randomness, spectators, connection flags |
 | `src/App.tsx` | Home screen (create/join), table screen header and footer, invite dialog, notices |
 | `src/components/PokerTable.tsx` | The table: seats around the felt, board cards, chips, pots, turn timers, showdown results |
@@ -296,7 +298,6 @@ These live at the top of `src/engine/pokerEngine.ts`, `../shared/tableNet.ts` an
 |---|---|
 | Seats per table | 10 (`MAX_SEATS`) |
 | People in a room, seated plus queued | 30 (`MAX_MEMBERS`) |
-| Distinct identities over a room's lifetime | 256 (public-key pins retained after departure) |
 | Waiting queue | 20 (`MAX_QUEUE`) |
 | Time per turn | 60 s (`TURN_MS`) |
 | Pause after a showdown | 6 s (`SHOWDOWN_MS`) |
@@ -310,7 +311,7 @@ These live at the top of `src/engine/pokerEngine.ts`, `../shared/tableNet.ts` an
   `npm test`. The random-play check at a full 10-seat table catches chips being created or lost.
 - **Message format:** clients and the host must run the same version. If you change messages in
   `../shared/tableNet.ts` or `pokerNet.ts` in a way older versions can't read, change the `prefix` in `pokerNet.ts`
-  (currently `p2p-holdem-v7-`) so old and new versions can't join each other's rooms.
+  (currently `p2p-holdem-v6-`) so old and new versions can't join each other's rooms.
 - **Look and layout:** everything is Tailwind classes in the components. `tall:` in class names means "wide
   and tall screen" (defined in `index.css`), used so short laptop screens keep the mid-size table.
 
@@ -330,15 +331,14 @@ design:
 - **Anyone with the room code can join.** Codes are random (6 characters), but share them only with people
   you want at the table. The room creator can remove players, though someone determined could come back
   from a new browser tab.
-- **The host's browser runs the game**, so a host who edits the page's code could cheat. Spectators see all
-  hands, and the automatically selected backup also sees the deck (see [Keeping cards secret](#keeping-cards-secret)).
+- **The host's browser runs the game**, so a host who edits the page's code could cheat. The standby
+  player can see all cards (see [Keeping cards secret](#keeping-cards-secret)).
 - **The relay API key is visible** in the site's JavaScript (see
   [Players on mobile data or strict networks](#players-on-mobile-data-or-strict-networks)).
 
-What is protected: seats require proof of their pinned signing key, messages are size-limited and checked
-before use, shuffling uses the browser's cryptographic random numbers, and ordinary players only receive
-their own hole cards unless automatically selected as backup. The deploy workflow pins every action to an exact
-commit, and Dependabot alerts are on.
+What is protected: seats can't be taken over without their secret, messages are size-limited and checked
+before use, shuffling uses the browser's cryptographic random numbers, and players only receive their own
+hole cards. The deploy workflow pins every action to an exact commit, and Dependabot alerts are on.
 
 Found a problem? Open an issue on GitHub.
 

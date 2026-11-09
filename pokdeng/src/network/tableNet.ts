@@ -7,7 +7,7 @@ export { randomRoomCode, type Identity, type NetStatus } from '../../../shared/t
 /** Pok Deng's side of the shared room: the engine, the room-id prefix and the shape of a move. */
 const rules: Rules<GameState, PlayerAction> = {
   ...engine,
-  prefix: 'p2p-pokdeng-v3-',
+  prefix: 'p2p-pokdeng-v2-',
   validAction: (a): a is PlayerAction => {
     const x = a as PlayerAction | null;
     return !!x && (['draw', 'stay', 'ready', 'clear'].includes(x.type)

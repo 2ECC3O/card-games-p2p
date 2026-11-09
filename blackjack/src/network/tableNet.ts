@@ -7,7 +7,7 @@ export { randomRoomCode, type Identity, type NetStatus } from '../../../shared/t
 /** Blackjack's side of the shared room: the engine, the room-id prefix and the shape of a move. */
 const rules: Rules<GameState, PlayerAction> = {
   ...engine,
-  prefix: 'p2p-blackjack-v4-',
+  prefix: 'p2p-blackjack-v3-',
   validAction: (a): a is PlayerAction => {
     const x = a as PlayerAction | null;
     return !!x && (['hit', 'stand', 'double', 'split'].includes(x.type) || (x.type === 'bet' && Number.isInteger(x.amount)));

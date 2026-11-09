@@ -7,7 +7,7 @@ export { randomRoomCode, type Identity, type NetStatus } from '../../../shared/t
 /** Hold'em's side of the shared room: the engine, the room-id prefix and the shape of a move. */
 const rules: Rules<GameState, PlayerAction> = {
   ...engine,
-  prefix: 'p2p-holdem-v7-',
+  prefix: 'p2p-holdem-v6-',
   validAction: (a): a is PlayerAction => {
     const x = a as PlayerAction | null;
     return !!x && (['fold', 'check', 'call'].includes(x.type) || (x.type === 'raise' && Number.isInteger(x.amount)));

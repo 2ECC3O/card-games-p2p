@@ -4,9 +4,7 @@ Play [eight-ball](https://www.wpapool.com/wp-content/uploads/2026/01/2026.01.02-
 
 ## Playing
 
-Create or join a room and share the code. The host chooses singles or doubles and a race to 1, 3, or 5 racks. Watch joins without a seat; naming a watch browser **TOURNAMENT** adds the room QR, score board and action feed. The host browser runs the match. A connected participant is automatically selected for full-state backup
-and continues the same rack if the host disconnects, without manual setup. A tournament display can take
-this role when no player is connected. Pool has no hidden cards.
+Create or join a room and share the code. The host chooses singles or doubles and a race to 1, 3, or 5 racks. Watch joins without a seat; naming a watch browser **TOURNAMENT** adds the room QR, score board and action feed. The host browser runs the match and needs to remain online; another connected player can take over if it leaves.
 
 Drag on the table to aim (a tap aims too). Fine-angle buttons move the cue by 1° or 0.2°. Set the power, tap the big cue ball to pick where to strike it (centre, top for follow, bottom for draw, left or right for side spin), then **Shoot**. The guide runs the real physics: a dashed line for the cue ball's path to its first contact, including cushion bounces, then short lines for where the cue ball and the ball it hits go next. For a non-break shot, tap a ball and a pocket to call it (or use the menus), or declare a safety. Ball in hand lets you tap a free spot; on the break, the spot must be behind the head string.
 
@@ -19,10 +17,3 @@ The physics is a 2D model with sliding and rolling friction, so stun, draw and f
 ## Local development
 
 Requires Node.js 20.19 or newer. From the repository root run `npm install` once, then `npm run dev -w pool`; `npm test -w pool` and `npm run build -w pool` test and build it. The room, How to play guide, chime and wake lock come from `../shared/`. Like the other games, publishing occurs through the root GitHub Pages workflow.
-
-Connections require **HTTPS or localhost**; plain HTTP LAN addresses are unsupported. Per-tab WebCrypto
-signing keys prove identities without transmitting private keys or raw reconnect secrets. Backup snapshots
-carry public verification keys. The backup is replaced automatically on disconnect, leave, expiry or removal. See
-[signed authentication and failover](../poker/README.md#identity-and-reconnecting).
-
-Bump `prefix` in `src/network/tableNet.ts` (currently `p2p-pool-v3-`) when the wire format changes.

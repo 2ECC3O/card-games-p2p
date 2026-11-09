@@ -73,17 +73,10 @@ game's plus the shared network checks); `npm run build -w pokdeng` makes the sta
 - `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
   its room prefix and the shape of a valid move. `maskFor` hides the deck, and every hand but
   your own (a Pok and caught hands are face up) until the round settles; the dealer's cards show after a catch.
-  Spectators and the TOURNAMENT display still see every hand. A connected participant is automatically
-  selected for full-state backup and continues the exact hand if the host disconnects, without setup.
-  That backup can inspect every card and the deck; use rooms with people you trust.
+  Spectators see everything.
 - `src/components/PokDengTable.tsx`, `ActionControls.tsx`: the table and the bet, limit, draw and dealer controls.
 
-Connections require **HTTPS or localhost**; plain HTTP LAN addresses are unsupported. Per-tab WebCrypto
-signing keys prove identities without transmitting private keys or raw reconnect secrets. Backup snapshots
-carry public verification keys. The backup is replaced automatically on disconnect, leave, expiry or removal; previously received cards
-cannot be erased. See [signed authentication and failover](../poker/README.md#identity-and-reconnecting).
-
-Bump `prefix` in `src/network/tableNet.ts` (currently `p2p-pokdeng-v3-`) when the wire format changes.
+Bump `prefix` in `src/network/tableNet.ts` when the wire format changes.
 
 ## License
 

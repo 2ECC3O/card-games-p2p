@@ -40,9 +40,4 @@ await assert.rejects(decode(new Uint8Array(MAX_PACKED_BYTES + 1)), /too large/);
 const big = { t: 'state', filler: 'x'.repeat(MAX_UNPACKED_BYTES - 100) };
 assert.deepEqual(await decode(await encode(big)), big);
 
-// Hosts can impose a smaller limit on client commands without restricting recovery snapshots.
-const oversizedAction = await encode({ t: 'act', filler: 'x'.repeat(20000) });
-await assert.rejects(decode(oversizedAction, { maxUnpacked: 16 * 1024 }), /too large/);
-assert.equal((await decode(oversizedAction) as { t: string }).t, 'act');
-
 console.log(`network: all checks passed (${plain} B -> ${packed.byteLength} B)`);

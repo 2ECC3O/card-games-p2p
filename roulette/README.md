@@ -57,20 +57,13 @@ Same design as Blackjack P2P:
   The number is drawn with `crypto.getRandomValues` when betting closes.
 - `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
   its room prefix and the shape of a valid move. The host checks every bet, then sends everyone the table (nothing
-  is hidden in roulette). A connected participant is automatically selected for full-state backup and
-  continues the same round if the host disconnects. No manual backup selection is needed.
-  Reload reconnects to your seat within 60 seconds.
+  is hidden in roulette). A standby player holds a snapshot and takes over if the host drops; reload
+  reconnects to your seat within 60 seconds.
 - `src/components/RouletteTable.tsx`, `ActionControls.tsx`: the wheel, the board, and the chip controls.
   Each screen spins its own wheel when it hears the result and shows the outcome once it stops.
 
 Timings and limits live at the top of the engine (`BET_MS`, `SPIN_MS`, `SETTLE_MS`, `MAX_SEATS`).
-Connections require **HTTPS or localhost**; plain HTTP LAN addresses are unsupported. Per-tab WebCrypto
-signing keys prove identities without transmitting private keys or raw reconnect secrets. Backup snapshots
-carry public verification keys. The backup is replaced automatically on disconnect, leave, expiry or removal. See
-[signed authentication and failover](../poker/README.md#identity-and-reconnecting).
-
-When the wire format changes, bump `prefix` in `src/network/tableNet.ts` (currently `p2p-roulette-v5-`)
-so old and new pages never share a room.
+When the wire format changes, bump `prefix` in `src/network/tableNet.ts` so old and new pages never share a room.
 
 ## License
 

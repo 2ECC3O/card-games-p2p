@@ -173,18 +173,4 @@ const cards = (s: GameState, id: string) => handsOf(s, id)[0].cards;
   s = hostTick(s, 2001 + TURN_MS);
   assert.deepEqual([s.phase, s.dealer.length], ['settled', 3], 'the dealer on 3 draws');
 }
-// Hostile legacy identities must not overlap the reserved seat/last betting positions.
-for (const reserved of ['seat', 'last']) {
-  let s = createGame('ATTACK', config, 0);
-  for (const id of ['dealer', reserved, 'victim']) s = addPlayer(s, id, id, 0);
-  s.started = true;
-  startRound(s, 1, stack('3s', '4s', '2s', '3h', '4h', '2h'));
-  s = applyAction(s, reserved, { type: 'ready' }, 2);
-  s = applyAction(s, 'victim', { type: 'bet', amount: 100, spot: reserved, ready: true }, 3);
-  assert.equal(s.hands.length, 1, `${reserved}: a hand appears once in dealing order`);
-  assert.equal(s.hands[0].cards.length, 2, `${reserved}: one two-card deal`);
-  s = applyAction(s, 'victim', { type: 'stay' }, 4);
-  s = applyAction(s, 'dealer', { type: 'stay' }, 5);
-  assert.equal(s.players.reduce((sum, p) => sum + p.chips, 0), 3000, `${reserved}: stakes settle exactly once`);
-}
 console.log('pok deng engine: all checks passed');

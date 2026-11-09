@@ -64,18 +64,11 @@ game's plus the shared network checks); `npm run build -w slave` makes the stati
 - `src/engine/slaveEngine.ts`: the rules as pure functions over one `GameState`. Only the host runs them.
 - `src/network/tableNet.ts`: this game's side of the shared PeerJS room (`../shared/tableNet.ts`): its engine,
   its room prefix and the shape of a valid move. `maskFor` hides every hand but your own, and
-  exchanges you're not part of. Spectators and the TOURNAMENT display still see every hand. A connected
-  participant is automatically selected for full-state backup and continues the same round if the host
-  disconnects, without setup. That backup can inspect all cards; play with people you trust.
+  exchanges you're not part of. Spectators see everything.
 - `src/components/SlaveTable.tsx`, `HandControls.tsx`: the table, and your hand with its play, pass and give
   buttons.
 
-Connections require **HTTPS or localhost**; plain HTTP LAN addresses are unsupported. Per-tab WebCrypto
-signing keys prove identities without transmitting private keys or raw reconnect secrets. Backup snapshots
-carry public verification keys. The backup is replaced automatically on disconnect, leave, expiry or removal; previously received cards
-cannot be erased. See [signed authentication and failover](../poker/README.md#identity-and-reconnecting).
-
-Bump `prefix` in `src/network/tableNet.ts` (currently `p2p-slave-v5-`) when the wire format changes.
+Bump `prefix` in `src/network/tableNet.ts` when the wire format changes.
 
 ## License
 
