@@ -4,7 +4,9 @@ import { test } from 'node:test';
 import { TableNet } from './tableNet.ts';
 import { encode, decode, MAX_PACKED_BYTES } from './codec.ts';
 
+let nextPeer = 0;
 class Connection extends EventEmitter {
+  peer = `remote-${++nextPeer}`;
   open = true;
   sent = [];
   bufferSize = 0;

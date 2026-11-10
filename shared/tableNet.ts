@@ -45,6 +45,7 @@ const MAX_BUFFER_BYTES = 256 * 1024;
 
 interface Link {
   admitted: boolean;
+  watch?: boolean;
   since: number;
   incoming: number;
   incomingBytes: number;
@@ -138,6 +139,7 @@ export class TableNet<S extends RoomState, A> {
   private pendingJoin: { resolve(): void; reject(e: Error): void } | null = null;
   // Compression is asynchronous, so each connection chains its sends to keep messages in order.
   private outbox = new WeakMap<DataConnection, Promise<void>>();
+  private pendingState = new WeakMap<DataConnection, { msg: Msg<S, A>; size: number }>();
   private links = new Map<DataConnection, Link>();
   private admission = { at: 0, count: 0 };
   private rate = { at: 0, messages: 0, bytes: 0 };
@@ -313,13 +315,26 @@ export class TableNet<S extends RoomState, A> {
     const link = this.links.get(conn);
     if (!link) return;
     const size = new TextEncoder().encode(JSON.stringify(msg)).byteLength;
-    if (size > MAX_UNPACKED_BYTES || link.outgoing >= 32 || this.outgoing >= 256 ||
-      link.outgoingBytes + size > MAX_UNPACKED_BYTES * 2 || this.outgoingBytes + size > MAX_UNPACKED_BYTES * 8) return this.drop(conn);
+    // Only the trailing pending state can be replaced: control messages are ordering boundaries.
+    const pending = msg.t === 'state' ? this.pendingState.get(conn) : undefined;
+    const added = size - (pending?.size ?? 0);
+    if (size > MAX_UNPACKED_BYTES || (!pending && (link.outgoing >= 32 || this.outgoing >= 256)) ||
+      link.outgoingBytes + added > MAX_UNPACKED_BYTES * 2 || this.outgoingBytes + added > MAX_UNPACKED_BYTES * 8) return this.drop(conn);
+    link.outgoingBytes += added; this.outgoingBytes += added;
+    if (pending) {
+      Object.assign(pending, { msg, size });
+      return;
+    }
+    const entry = { msg, size };
+    if (msg.t === 'state') this.pendingState.set(conn, entry);
+    else this.pendingState.delete(conn);
     if (!link.outgoing) link.sendingSince = Date.now();
-    link.outgoing++; link.outgoingBytes += size;
-    this.outgoing++; this.outgoingBytes += size;
+    link.outgoing++; this.outgoing++;
     const next = (this.outbox.get(conn) ?? Promise.resolve())
-      .then(() => this.links.has(conn) && conn.open ? encode(msg) : null)
+      .then(() => {
+        if (this.pendingState.get(conn) === entry) this.pendingState.delete(conn);
+        return this.links.has(conn) && conn.open ? encode(entry.msg) : null;
+      })
       .then((bytes) => {
         if (!bytes || !this.links.has(conn) || !conn.open) return;
         const buffered = conn.dataChannel?.bufferedAmount ?? 0;
@@ -331,8 +346,8 @@ export class TableNet<S extends RoomState, A> {
       })
       .catch(() => this.drop(conn))
       .finally(() => {
-        link.outgoing--; link.outgoingBytes -= size;
-        this.outgoing--; this.outgoingBytes -= size;
+        link.outgoing--; link.outgoingBytes -= entry.size;
+        this.outgoing--; this.outgoingBytes -= entry.size;
       });
     this.outbox.set(conn, next);
   }
@@ -564,6 +579,11 @@ export class TableNet<S extends RoomState, A> {
       if (this.removed.has(msg.id)) return reject(REMOVED);
       const secretHash = sha256(msg.secret);
       if (m && m.secretHash !== secretHash) return reject('That seat belongs to someone else.');
+      const link = this.links.get(conn);
+      if (m?.conn === conn && m.name === name && m.peerId === msg.peerId && link?.watch === (msg.watch === true)) {
+        m.lastSeen = now;
+        return;
+      }
       if (!m) {
         if (this.members.size >= MAX_MEMBERS) return reject('This room is full.');
         m = { id: msg.id, secretHash, name, peerId: msg.peerId, conn: null, lastSeen: now, goneAt: null };
@@ -571,8 +591,7 @@ export class TableNet<S extends RoomState, A> {
       }
       if (m.conn && m.conn !== conn) m.conn.close();
       Object.assign(m, { conn, name, peerId: msg.peerId, lastSeen: now, goneAt: null });
-      const link = this.links.get(conn);
-      if (link) link.admitted = true;
+      if (link) { link.admitted = true; link.watch = msg.watch === true; }
       this.state = (msg.watch === true ? this.rules.addSpectator : this.rules.addPlayer)(this.state!, m.id, name, now);
       return this.broadcast();
     }
@@ -597,7 +616,9 @@ export class TableNet<S extends RoomState, A> {
         return this.broadcast();
       case 'rejoin':
         if (!this.rules.rejoinQueue) return;
-        this.state = this.rules.rejoinQueue(this.state!, m.id, m.name, now);
+        const next = this.rules.rejoinQueue(this.state!, m.id, m.name, now);
+        if (next === this.state) return;
+        this.state = next;
         return this.broadcast();
       case 'leave':
         this.members.delete(m.id);
