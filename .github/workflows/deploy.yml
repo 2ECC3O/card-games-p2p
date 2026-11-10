@@ -1,15 +1,18 @@
-# Test, build and publish every game to GitHub Pages on every push to main (or by hand from the Actions tab).
+# Check pull requests and Codex branches; publish games only from main.
 # The site: index.html (the game picker) at the root, each game in its own folder.
 name: Deploy to GitHub Pages
 
 on:
   push:
+    branches: [main, 'codex/**']
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
-# One deployment at a time; a newer push waits for the running one.
+# Keep releases ordered; superseded branch/PR checks can stop early.
 concurrency:
-  group: pages
+  group: pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -26,6 +29,10 @@ jobs:
 
       # One install for every game (npm workspaces), then every game's tests and build.
       - run: npm ci
+      - name: Audit game dependencies
+        run: npm audit --audit-level=high --ignore-scripts
+      - name: Audit video tooling lockfile
+        run: npm audit --prefix ad-video --package-lock-only --audit-level=high --ignore-scripts
       - run: npm test
       - run: npm run build
         env:
@@ -44,6 +51,7 @@ jobs:
           path: site/
 
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

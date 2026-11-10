@@ -1,7 +1,14 @@
-# Keeps the commit-pinned actions in deploy.yml up to date with pull requests (security alerts for npm
-# packages are turned on in the repository settings).
+# Propose updates to game/video dependencies and commit-pinned deployment actions.
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /ad-video
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     schedule:
