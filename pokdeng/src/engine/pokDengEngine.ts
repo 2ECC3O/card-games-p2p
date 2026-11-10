@@ -223,7 +223,7 @@ function dealingOrder(s: GameState): { before: Hand[]; last: Hand[] } {
   const around = [...s.players.filter((p) => p.seat > start), ...s.players.filter((p) => p.seat <= start)].filter((p) => p.id !== s.bankerId);
   const cuts = new Set(around.map((p) => p.id));
   const before = around.flatMap((p) => [
-    ...s.hands.filter((h) => h.spot === p.id && h.owner !== p.id),
+    ...s.hands.filter((h) => h.spot !== 'seat' && h.spot !== 'last' && h.spot === p.id && h.owner !== p.id),
     ...s.hands.filter((h) => h.owner === p.id && (h.spot === 'seat' || (h.spot !== 'last' && !cuts.has(h.spot)))),
   ]);
   return { before, last: s.hands.filter((h) => h.spot === 'last') };

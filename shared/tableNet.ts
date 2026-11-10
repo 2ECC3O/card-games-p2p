@@ -93,6 +93,18 @@ interface Snapshot<S> {
   removed: string[];
 }
 
+const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const memberId = (v: unknown) => str(v, 64) && v !== 'seat' && v !== 'last' && !isBot(v as string);
+const roomState = (v: unknown) => object(v)
+  && Array.isArray(v.players) && v.players.every((p) => object(p) && str(p.id, 64))
+  && Array.isArray(v.queue) && v.queue.every((p) => object(p) && str(p.id, 64))
+  && typeof v.lastActionAt === 'number' && Number.isFinite(v.lastActionAt);
+const snapshot = (v: unknown) => object(v) && roomState(v.state)
+  && Array.isArray(v.members) && v.members.every((m) => object(m) && memberId(m.id)
+    && typeof m.name === 'string' && str(m.peerId, 128)
+    && typeof m.secretHash === 'string' && /^[a-f0-9]{64}$/.test(m.secretHash))
+  && Array.isArray(v.removed) && v.removed.every((id) => str(id, 64));
+
 type Msg<S, A> =
   | ({ t: 'hello'; peerId: string } & Identity)
   | { t: 'act'; action: A }
@@ -289,7 +301,7 @@ export class TableNet<S extends RoomState, A> {
         .then(() => this.links.has(conn) && !this.destroyed ? decode(data) : null)
         .then((m) => {
           if (this.destroyed || !this.links.has(conn)) return;
-          if (!m || typeof (m as Msg<S, A>).t !== 'string') return this.drop(conn);
+          if (!object(m) || typeof m.t !== 'string') return this.drop(conn);
           if (this.role === 'host') this.onClientMsg(conn, m as Msg<S, A>);
           else this.onHostMsg(conn, m as Msg<S, A>);
         })
@@ -435,9 +447,12 @@ export class TableNet<S extends RoomState, A> {
   }
 
   private onHostMsg(conn: DataConnection, msg: Msg<S, A>) {
+    if ((msg.t === 'error' || msg.t === 'reject' || msg.t === 'closed') && typeof msg.message !== 'string') return;
     const now = Date.now();
     switch (msg.t) {
       case 'state':
+        if (!roomState(msg.state) || (msg.standbyId !== null && !memberId(msg.standbyId))
+          || (msg.snapshot !== undefined && !snapshot(msg.snapshot))) return;
         if (this.hostConn !== conn) {
           if (this.hostConn && now - this.lastPong < DEAD_MS) return conn.close(); // stale second link
           this.hostConn?.close();
@@ -463,7 +478,7 @@ export class TableNet<S extends RoomState, A> {
         return;
       case 'closed':
         if (conn !== this.hostConn) return;
-        this.events.onClosed(typeof msg.message === 'string' ? msg.message.slice(0, 200) : EXPIRED);
+        this.events.onClosed(msg.message.slice(0, 200));
         return this.destroy();
       case 'promote':
         // A standby took over. Only follow it if our own host has really gone quiet.
@@ -569,8 +584,10 @@ export class TableNet<S extends RoomState, A> {
       return;
     }
     if (msg.t === 'hello') {
+      if (!memberId(msg.id) || !str(msg.secret, 128) || !str(msg.peerId, 128) || !str(conn.peer, 128)
+        || typeof msg.name !== 'string' || (msg.watch !== undefined && typeof msg.watch !== 'boolean')) return conn.close();
+      if ([...this.members.values()].some((m) => m.conn === conn && m.id !== msg.id)) return conn.close();
       const name = cleanName(msg.name);
-      if (!str(msg.id, 64) || isBot(msg.id) || !str(msg.secret, 128) || !str(msg.peerId, 128)) return conn.close();
       let m = this.members.get(msg.id);
       const reject = (message: string) => {
         this.send(conn, { t: 'reject', message });
@@ -580,17 +597,17 @@ export class TableNet<S extends RoomState, A> {
       const secretHash = sha256(msg.secret);
       if (m && m.secretHash !== secretHash) return reject('That seat belongs to someone else.');
       const link = this.links.get(conn);
-      if (m?.conn === conn && m.name === name && m.peerId === msg.peerId && link?.watch === (msg.watch === true)) {
+      if (m?.conn === conn && m.name === name && m.peerId === conn.peer && link?.watch === (msg.watch === true)) {
         m.lastSeen = now;
         return;
       }
       if (!m) {
         if (this.members.size >= MAX_MEMBERS) return reject('This room is full.');
-        m = { id: msg.id, secretHash, name, peerId: msg.peerId, conn: null, lastSeen: now, goneAt: null };
+        m = { id: msg.id, secretHash, name, peerId: conn.peer, conn: null, lastSeen: now, goneAt: null };
         this.members.set(m.id, m);
       }
       if (m.conn && m.conn !== conn) m.conn.close();
-      Object.assign(m, { conn, name, peerId: msg.peerId, lastSeen: now, goneAt: null });
+      Object.assign(m, { conn, name, peerId: conn.peer, lastSeen: now, goneAt: null });
       if (link) { link.admitted = true; link.watch = msg.watch === true; }
       this.state = (msg.watch === true ? this.rules.addSpectator : this.rules.addPlayer)(this.state!, m.id, name, now);
       return this.broadcast();

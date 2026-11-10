@@ -124,6 +124,19 @@ const cards = (s: GameState, id: string) => handsOf(s, id)[0].cards;
   assert.deepEqual([handsOf(s, 'p1')[0].bet, chips(s, 'p1')], [50, 950]);
   assert.throws(() => act(s, 'p1', { type: 'bet', amount: 60, spot: 'seat' }), /limit is 50/);
 }
+for (const reservedId of ['seat', 'last']) {
+  // Existing identities must not turn a placement sentinel into a second copy of the same hand.
+  let s = table(3, stack('2s', '4h', 'Tc', '4d', 'Ks', '8c'));
+  s.players[1].id = reservedId;
+  s = act(s, reservedId, { type: 'ready' });
+  s = bet(s, 'p2', 100, reservedId);
+  for (let turn = 0; turn < 3 && s.phase === 'playing'; turn++) s = act(s, s.activeId!, { type: 'stay' });
+  assert.equal(s.phase, 'settled', `${reservedId}: the round settles`);
+  assert.equal(s.players.reduce((sum, p) => sum + p.chips, 0), 3000, `${reservedId}: settlement conserves chips`);
+  assert.equal(s.hands.length, 1, `${reservedId}: each bet is dealt once`);
+  assert.equal(new Set(s.hands.map((h) => h.id)).size, s.hands.length);
+  assert.equal(s.hands[0].cards.length, 2, `${reservedId}: each hand receives two cards`);
+}
 {
   // A dealer who runs dry pays winners in dealing order until the chips run out.
   let s = table(3, stack('7h', '7s', '2c', 'Kc', 'Qd', '3d'));
