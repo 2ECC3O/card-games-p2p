@@ -12,7 +12,7 @@
     "slave"
   ],
   "scripts": {
-    "test": "node --test home-ads.test.js analytics.test.js && tsx shared/analytics.test.ts && tsx shared/network.test.ts && npm test --workspaces",
+    "test": "node --test home-ads.test.js analytics.test.js && node --import tsx --test shared/transport-limits.test.mjs && tsx shared/analytics.test.ts && tsx shared/network.test.ts && npm test --workspaces",
     "build": "npm run build --workspaces"
   }
 }

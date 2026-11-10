@@ -1,5 +1,5 @@
 import Peer, { type DataConnection } from 'peerjs';
-import { decode, encode } from './codec';
+import { decode, encode, MAX_PACKED_BYTES, MAX_UNPACKED_BYTES } from './codec';
 import { iceServers } from './iceServers';
 import { cleanName, IDLE_MS, isBot } from './lobby';
 import { sha256 } from './sha256';
@@ -40,6 +40,19 @@ const PING_MS = 2_000;
 const DEAD_MS = 6_000;
 const GRACE_MS = 60_000;
 const MAX_MEMBERS = 30;
+const MAX_LINKS = MAX_MEMBERS * 2; // includes reconnects and outgoing takeover links
+const MAX_BUFFER_BYTES = 256 * 1024;
+
+interface Link {
+  admitted: boolean;
+  since: number;
+  incoming: number;
+  incomingBytes: number;
+  outgoing: number;
+  outgoingBytes: number;
+  sendingSince: number;
+  rate: { at: number; messages: number; bytes: number };
+}
 
 export interface Identity {
   id: string;
@@ -125,6 +138,15 @@ export class TableNet<S extends RoomState, A> {
   private pendingJoin: { resolve(): void; reject(e: Error): void } | null = null;
   // Compression is asynchronous, so each connection chains its sends to keep messages in order.
   private outbox = new WeakMap<DataConnection, Promise<void>>();
+  private links = new Map<DataConnection, Link>();
+  private admission = { at: 0, count: 0 };
+  private rate = { at: 0, messages: 0, bytes: 0 };
+  // ponytail: one bounded decode chain caps aggregate decompression work; parallelize only if measured slow.
+  private inbox = Promise.resolve();
+  private incoming = 0;
+  private incomingBytes = 0;
+  private outgoing = 0;
+  private outgoingBytes = 0;
   private timer: ReturnType<typeof setInterval>;
   private destroyed = false;
 
@@ -218,6 +240,7 @@ export class TableNet<S extends RoomState, A> {
   destroy() {
     this.destroyed = true;
     clearInterval(this.timer);
+    for (const conn of this.links.keys()) this.drop(conn);
     this.peer.destroy();
     this.roomPeer?.destroy();
   }
@@ -225,38 +248,92 @@ export class TableNet<S extends RoomState, A> {
   // ------------------------------------------------ plumbing
 
   private listen(peer: Peer) {
-    peer.on('connection', (conn) => this.wire(conn));
+    peer.on('connection', (conn) => this.wire(conn, true));
     peer.on('disconnected', () => {
       if (!this.destroyed && !peer.destroyed) peer.reconnect(); // signaling dropped; data channels live on
     });
     peer.on('error', () => {}); // e.g. dialing a member that is gone; the heartbeat handles recovery
   }
 
-  private wire(conn: DataConnection) {
-    let inbox = Promise.resolve(); // decode in arrival order
+  private wire(conn: DataConnection, incoming = false) {
+    const now = Date.now();
+    if (now - this.admission.at >= 10_000) this.admission = { at: now, count: 0 };
+    if (this.destroyed || this.links.size >= MAX_LINKS ||
+      (incoming && (++this.admission.count > MAX_LINKS || [...this.links.values()].filter((l) => !l.admitted).length >= MAX_MEMBERS))) {
+      conn.close();
+      return;
+    }
+    const link: Link = { admitted: false, since: now, incoming: 0, incomingBytes: 0, outgoing: 0, outgoingBytes: 0,
+      sendingSince: 0, rate: { at: now, messages: 0, bytes: 0 } };
+    this.links.set(conn, link);
     conn.on('data', (data) => {
-      inbox = inbox
-        .then(() => decode(data))
+      if (!this.links.has(conn) || this.destroyed) return;
+      const size = data instanceof Uint8Array || data instanceof ArrayBuffer ? data.byteLength : 0;
+      const now = Date.now();
+      for (const rate of [link.rate, this.rate]) {
+        if (now - rate.at >= 1_000) Object.assign(rate, { at: now, messages: 0, bytes: 0 });
+        rate.messages++;
+        rate.bytes += size;
+      }
+      if (!size || size > MAX_PACKED_BYTES || link.incoming >= 8 || this.incoming >= 64 ||
+        link.incomingBytes + size > MAX_PACKED_BYTES * 2 || this.incomingBytes + size > MAX_UNPACKED_BYTES ||
+        link.rate.messages > 30 || link.rate.bytes > MAX_BUFFER_BYTES || this.rate.messages > 240 || this.rate.bytes > MAX_BUFFER_BYTES * 8) {
+        this.drop(conn);
+        return;
+      }
+      link.incoming++; link.incomingBytes += size;
+      this.incoming++; this.incomingBytes += size;
+      this.inbox = this.inbox
+        .then(() => this.links.has(conn) && !this.destroyed ? decode(data) : null)
         .then((m) => {
-          if (this.destroyed || !m || typeof (m as Msg<S, A>).t !== 'string') return;
+          if (this.destroyed || !this.links.has(conn)) return;
+          if (!m || typeof (m as Msg<S, A>).t !== 'string') return this.drop(conn);
           if (this.role === 'host') this.onClientMsg(conn, m as Msg<S, A>);
           else this.onHostMsg(conn, m as Msg<S, A>);
         })
-        .catch(() => {}); // not a valid compressed message: ignore it
+        .catch(() => this.drop(conn))
+        .finally(() => {
+          link.incoming--; link.incomingBytes -= size;
+          this.incoming--; this.incomingBytes -= size;
+        });
     });
-    const closed = () => this.onClose(conn);
+    const closed = () => { this.links.delete(conn); this.onClose(conn); };
     conn.on('close', closed);
     conn.on('error', closed);
   }
 
+  private drop(conn: DataConnection) {
+    this.links.delete(conn);
+    conn.close();
+    this.onClose(conn);
+  }
+
   private send(conn: DataConnection | null, msg: Msg<S, A>) {
     if (!conn?.open) return;
+    const link = this.links.get(conn);
+    if (!link) return;
+    const size = new TextEncoder().encode(JSON.stringify(msg)).byteLength;
+    if (size > MAX_UNPACKED_BYTES || link.outgoing >= 32 || this.outgoing >= 256 ||
+      link.outgoingBytes + size > MAX_UNPACKED_BYTES * 2 || this.outgoingBytes + size > MAX_UNPACKED_BYTES * 8) return this.drop(conn);
+    if (!link.outgoing) link.sendingSince = Date.now();
+    link.outgoing++; link.outgoingBytes += size;
+    this.outgoing++; this.outgoingBytes += size;
     const next = (this.outbox.get(conn) ?? Promise.resolve())
-      .then(() => encode(msg))
+      .then(() => this.links.has(conn) && conn.open ? encode(msg) : null)
       .then((bytes) => {
-        if (conn.open) conn.send(bytes);
+        if (!bytes || !this.links.has(conn) || !conn.open) return;
+        const buffered = conn.dataChannel?.bufferedAmount ?? 0;
+        const queued = (conn as DataConnection & { bufferSize?: number }).bufferSize ?? 0;
+        const totalBuffered = [...this.links.keys()].reduce((sum, c) => sum + (c.dataChannel?.bufferedAmount ?? 0), 0);
+        if (bytes.byteLength > MAX_PACKED_BYTES || queued > 0 || buffered + bytes.byteLength > MAX_BUFFER_BYTES ||
+          totalBuffered + bytes.byteLength > MAX_BUFFER_BYTES * 8) return this.drop(conn);
+        conn.send(bytes);
       })
-      .catch(() => {});
+      .catch(() => this.drop(conn))
+      .finally(() => {
+        link.outgoing--; link.outgoingBytes -= size;
+        this.outgoing--; this.outgoingBytes -= size;
+      });
     this.outbox.set(conn, next);
   }
 
@@ -272,6 +349,9 @@ export class TableNet<S extends RoomState, A> {
   private tick() {
     if (this.destroyed) return;
     const now = Date.now();
+    for (const [conn, link] of this.links) {
+      if ((!link.admitted && now - link.since > DEAD_MS) || (link.outgoing && now - link.sendingSince > DEAD_MS)) this.drop(conn);
+    }
     if (this.role === 'client') {
       if (now - this.lastPing >= PING_MS) {
         this.lastPing = now;
@@ -349,6 +429,8 @@ export class TableNet<S extends RoomState, A> {
           this.hostConn = conn;
         }
         this.lastPong = now;
+        const link = this.links.get(conn);
+        if (link) link.admitted = true;
         this.snapshot = msg.standbyId === this.me.id ? (msg.snapshot ?? null) : null;
         this.status('connected');
         if (!this.destroyed) this.events.onState(msg.state);
@@ -489,6 +571,8 @@ export class TableNet<S extends RoomState, A> {
       }
       if (m.conn && m.conn !== conn) m.conn.close();
       Object.assign(m, { conn, name, peerId: msg.peerId, lastSeen: now, goneAt: null });
+      const link = this.links.get(conn);
+      if (link) link.admitted = true;
       this.state = (msg.watch === true ? this.rules.addSpectator : this.rules.addPlayer)(this.state!, m.id, name, now);
       return this.broadcast();
     }
